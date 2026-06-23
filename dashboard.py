@@ -12,9 +12,11 @@ from openpyxl.utils import get_column_letter
 
 from database import (
     COLUNAS_EXIBICAO,
+    agora_brasil,
     buscar_todos,
     criar_tabela,
     formatar_datetime,
+    parse_datetime,
     registro_incompleto,
     status_registro,
     supabase_configurado,
@@ -38,16 +40,11 @@ FORM_BASE_URL_PADRAO = os.getenv("FORM_BASE_URL", "http://localhost:8501")
 
 
 def _parse_datetime(valor) -> datetime | None:
-    if valor is None:
-        return None
-    if isinstance(valor, datetime):
-        return valor
-    if isinstance(valor, date):
-        return datetime.combine(valor, datetime.min.time())
-    try:
-        return datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
-    except ValueError:
-        return None
+    return parse_datetime(valor)
+
+
+def _datetime_fallback() -> datetime:
+    return datetime.min.replace(tzinfo=agora_brasil().tzinfo)
 
 
 def _valor_vazio(valor) -> bool:
@@ -57,7 +54,7 @@ def _valor_vazio(valor) -> bool:
 def ordenar_por_data(registros: list[dict]) -> list[dict]:
     return sorted(
         registros,
-        key=lambda r: _parse_datetime(r.get("hora_conclusao")) or datetime.min,
+        key=lambda r: _parse_datetime(r.get("hora_conclusao")) or _datetime_fallback(),
         reverse=True,
     )
 
@@ -69,20 +66,20 @@ def ultimo_envio(registros: list[dict]) -> datetime | None:
 
 
 def contar_envios_hoje(registros: list[dict]) -> int:
-    hoje = date.today()
+    hoje = agora_brasil().date()
     return sum(
         1
         for r in registros
-        if (_parse_datetime(r.get("hora_conclusao")) or datetime.min).date() == hoje
+        if (_parse_datetime(r.get("hora_conclusao")) or _datetime_fallback()).date() == hoje
     )
 
 
 def contar_envios_semana(registros: list[dict]) -> int:
-    inicio = date.today() - timedelta(days=6)
+    inicio = agora_brasil().date() - timedelta(days=6)
     return sum(
         1
         for r in registros
-        if (_parse_datetime(r.get("hora_conclusao")) or datetime.min).date() >= inicio
+        if (_parse_datetime(r.get("hora_conclusao")) or _datetime_fallback()).date() >= inicio
     )
 
 
@@ -215,7 +212,7 @@ def aplicar_filtros(
 
 
 def grafico_envios_por_dia(registros: list[dict]) -> pd.DataFrame:
-    hoje = date.today()
+    hoje = agora_brasil().date()
     dias = [hoje - timedelta(days=i) for i in range(6, -1, -1)]
     contagem = {d.strftime("%d/%m"): 0 for d in dias}
 
@@ -307,9 +304,9 @@ if auto_atualizar:
         height=0,
     )
 
-agora = datetime.now()
+agora = agora_brasil()
 st.caption(
-    f"Última leitura: {agora.strftime('%d/%m/%Y %H:%M:%S')} · "
+    f"Última leitura: {agora.strftime('%d/%m/%Y %H:%M:%S')} (horário de Brasília) · "
     "Linhas em amarelo = sem NF ou sem observação"
 )
 

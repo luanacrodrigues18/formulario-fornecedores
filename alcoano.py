@@ -1,6 +1,7 @@
-"""Assistente Alcoano — mascote e ajuda contextual do formulário."""
+"""Assistente ALUX — mascote e ajuda contextual do formulário."""
 
 import base64
+import re
 from pathlib import Path
 
 import streamlit as st
@@ -10,7 +11,7 @@ IMG_ALCOANO = BASE_DIR / "alcoano.png"
 
 MENSAGENS_PASSO = {
     1: (
-        "Oi! Sou o **Alcoano**, seu assistente Alcoa. "
+        "Oi! Sou o **ALUX**, seu assistente Alcoa. "
         "No passo 1, busque seu pedido pelo **nome da empresa** ou pelo **PO com Release** "
         "que você recebeu por e-mail."
     ),
@@ -26,7 +27,7 @@ MENSAGENS_PASSO = {
 
 MENSAGEM_SUCESSO = (
     "Missão cumprida! Seu envio foi registrado com sucesso. "
-    "Guarde o **número de protocolo** — ele identifica sua resposta."
+    "Guarde o **número de protocolo**  ele identifica sua resposta."
 )
 
 DICAS_CAMPOS = {
@@ -150,6 +151,10 @@ ALCOANO_CSS = """
 """
 
 
+def _formatar_negrito(texto: str) -> str:
+    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", texto)
+
+
 def imagem_alcoano_b64() -> str | None:
     if IMG_ALCOANO.exists():
         return base64.b64encode(IMG_ALCOANO.read_bytes()).decode()
@@ -159,7 +164,7 @@ def imagem_alcoano_b64() -> str | None:
 def html_avatar_alcoano() -> str:
     b64 = imagem_alcoano_b64()
     if b64:
-        return f'<img src="data:image/png;base64,{b64}" alt="Alcoano" class="alcoano-img" />'
+        return f'<img src="data:image/png;base64,{b64}" alt="ALUX" class="alcoano-img" />'
     return "🤖"
 
 
@@ -169,20 +174,21 @@ def html_logo_hero() -> str:
         return ""
     return (
         f'<div class="hero-logo hero-logo-alcoano">'
-        f'<img src="data:image/png;base64,{b64}" alt="Alcoano" />'
+        f'<img src="data:image/png;base64,{b64}" alt="ALUX" />'
         f"</div>"
     )
 
 
-def render_bubble(mensagem: str, nome: str = "Alcoano") -> None:
+def render_bubble(mensagem: str, nome: str = "ALUX") -> None:
     avatar = html_avatar_alcoano()
+    corpo = _formatar_negrito(mensagem)
     st.markdown(
         f"""
         <div class="alcoano-wrap">
             <div class="alcoano-avatar" title="{nome}">{avatar}</div>
             <div class="alcoano-bubble">
                 <div class="alcoano-nome">{nome}</div>
-                {mensagem}
+                {corpo}
             </div>
         </div>
         """,
@@ -190,18 +196,18 @@ def render_bubble(mensagem: str, nome: str = "Alcoano") -> None:
     )
 
 
-def render_mensagem_passo(passo: int) -> None:
+def render_mensagem_passo(passo: int, compact: bool = False) -> None:
     mensagem = MENSAGENS_PASSO.get(passo)
     if mensagem:
         render_bubble(mensagem)
 
 
-def render_mensagem_sucesso() -> None:
+def render_mensagem_sucesso(compact: bool = False) -> None:
     render_bubble(MENSAGEM_SUCESSO)
 
 
 def render_dicas_formulario() -> None:
-    with st.expander("💡 Dicas do Alcoano — o que preencher em cada campo", expanded=False):
+    with st.expander("💡 Dicas do ALUX: o que preencher em cada campo", expanded=False):
         st.markdown(
             """
             <style>
@@ -222,7 +228,7 @@ def render_dicas_formulario() -> None:
 
 
 def render_faq() -> None:
-    with st.expander("❓ Perguntas frequentes — Alcoano", expanded=False):
+    with st.expander("❓ Perguntas frequentes ALUX", expanded=False):
         opcoes = [pergunta for pergunta, _ in FAQ]
         escolha = st.selectbox(
             "Selecione uma dúvida:",
@@ -237,4 +243,4 @@ def render_faq() -> None:
 
 
 def help_campo(chave: str) -> str:
-    return f"Alcoano: {DICAS_CAMPOS.get(chave, '')}"
+    return f"ALUX: {DICAS_CAMPOS.get(chave, '')}"

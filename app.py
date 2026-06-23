@@ -39,55 +39,17 @@ st.set_page_config(
     page_title="Formulário de Fornecedores",
     page_icon="📋",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 st.markdown(
     """
     <style>
         .block-container {
-            padding-top: 1.25rem;
+            padding-top: 2.5rem;
             padding-left: 2rem;
             padding-right: 2rem;
             max-width: 100%;
-        }
-        .hero {
-            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8e 55%, #3d7ab8 100%);
-            color: white;
-            padding: 2rem 2rem 1.75rem;
-            border-radius: 16px;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 8px 24px rgba(30, 58, 95, 0.25);
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-        }
-        .hero-logo img {
-            max-height: 64px;
-            width: auto;
-            background: transparent;
-            padding: 0;
-            border-radius: 0;
-            display: block;
-            filter: brightness(0) invert(1);
-        }
-        .hero-logo-alcoano img {
-            max-height: 80px;
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            object-fit: cover;
-            filter: none;
-            border: 3px solid rgba(255, 255, 255, 0.85);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-        }
-        .hero-text { flex: 1; }
-        .hero h1 { margin: 0 0 0.4rem 0; font-size: 1.85rem; }
-        .hero p { margin: 0; opacity: 0.92; font-size: 1.05rem; }
-        .step-row { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
-        div[data-testid="column"] .step { margin-bottom: 0.25rem; }
-        div[data-testid="stHorizontalBlock"]:has(.step.active) {
-            margin-bottom: 1rem;
         }
         .fornecedor-destaque {
             background: linear-gradient(135deg, #eef4fb 0%, #f8fafc 100%);
@@ -131,14 +93,129 @@ st.markdown(
             line-height: 1.4;
             word-break: break-word;
         }
-        .painel-ajuda {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 14px;
-            padding: 0.25rem 0.75rem 0.75rem 0.75rem;
+        section[data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #1e3a5f 0%, #152a45 100%);
         }
-        .painel-ajuda .alcoano-wrap {
-            margin: 1rem 0 1rem 0;
+        section[data-testid="stSidebar"] > div {
+            background: transparent;
+        }
+        [data-testid="stSidebar"] .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.25rem 0 0.75rem 0;
+        }
+        [data-testid="stSidebar"] .sidebar-brand-icon {
+            font-size: 1.75rem;
+            line-height: 1;
+        }
+        [data-testid="stSidebar"] .sidebar-brand-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #f8fafc;
+            line-height: 1.2;
+        }
+        [data-testid="stSidebar"] .sidebar-brand-sub {
+            font-size: 0.78rem;
+            color: #94a3b8;
+            margin-top: 0.1rem;
+        }
+        [data-testid="stSidebar"] .sidebar-nav-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #94a3b8;
+            margin: 0.5rem 0 0.35rem 0;
+        }
+        [data-testid="stSidebar"] hr {
+            border-color: rgba(255, 255, 255, 0.12);
+            margin: 0.85rem 0;
+        }
+        [data-testid="stSidebar"] label[data-baseweb="radio"],
+        [data-testid="stSidebar"] .stRadio label,
+        [data-testid="stSidebar"] .stRadio label p,
+        [data-testid="stSidebar"] .stRadio label span,
+        [data-testid="stSidebar"] .stRadio [data-testid="stMarkdown"] p {
+            color: #ffffff !important;
+        }
+        [data-testid="stSidebar"] .stRadio > div {
+            gap: 0.35rem;
+        }
+        [data-testid="stSidebar"] .stRadio label {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 0.5rem 0.65rem !important;
+        }
+        [data-testid="stSidebar"] .stRadio label:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+        [data-testid="stSidebar"] .alcoano-wrap {
+            margin: 0.5rem 0 1rem 0;
+        }
+        [data-testid="stSidebar"] .alcoano-bubble {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.18);
+            color: #f1f5f9;
+            box-shadow: none;
+        }
+        [data-testid="stSidebar"] .alcoano-bubble strong,
+        [data-testid="stSidebar"] .alcoano-nome {
+            color: #e2e8f0;
+        }
+        [data-testid="stSidebar"] .stExpander {
+            background: rgba(255, 255, 255, 0.07) !important;
+            border: 1px solid rgba(255, 255, 255, 0.14) !important;
+            border-radius: 10px;
+        }
+        [data-testid="stSidebar"] .streamlit-expanderHeader {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            color: #f8fafc !important;
+            border-radius: 10px;
+        }
+        [data-testid="stSidebar"] .streamlit-expanderHeader p,
+        [data-testid="stSidebar"] .streamlit-expanderHeader span,
+        [data-testid="stSidebar"] .stExpander summary,
+        [data-testid="stSidebar"] .stExpander summary p,
+        [data-testid="stSidebar"] .stExpander summary span {
+            color: #f8fafc !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stExpanderDetails"] {
+            background: rgba(0, 0, 0, 0.18) !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        [data-testid="stSidebar"] .stExpander [data-testid="stMarkdown"] p,
+        [data-testid="stSidebar"] .stExpander [data-testid="stMarkdown"] strong,
+        [data-testid="stSidebar"] .stExpander [data-testid="stMarkdown"] li {
+            color: #e2e8f0 !important;
+        }
+        [data-testid="stSidebar"] .stExpander .stCaption,
+        [data-testid="stSidebar"] .stExpander small,
+        [data-testid="stSidebar"] .stExpander label {
+            color: #cbd5e1 !important;
+        }
+        [data-testid="stSidebar"] .stExpander [data-testid="stSelectbox"] label {
+            color: #e2e8f0 !important;
+        }
+        [data-testid="stSidebar"] .stExpander [data-baseweb="select"] > div {
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f8fafc !important;
+            border-color: rgba(255, 255, 255, 0.2) !important;
+        }
+        [data-testid="stSidebar"] .stExpander [data-testid="stAlert"],
+        [data-testid="stSidebar"] .stExpander [data-testid="stNotificationContentInfo"] {
+            background-color: rgba(255, 255, 255, 0.12) !important;
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+            color: #f1f5f9 !important;
+        }
+        [data-testid="stSidebar"] .stExpander [data-testid="stAlert"] p {
+            color: #f1f5f9 !important;
+        }
+        [data-testid="stSidebar"] .stSelectbox label,
+        [data-testid="stSidebar"] .stCaption,
+        [data-testid="stSidebar"] small {
+            color: #cbd5e1 !important;
         }
         .busca-horizontal {
             background: #f8fafc;
@@ -147,9 +224,78 @@ st.markdown(
             padding: 1.25rem 1.5rem 0.5rem 1.5rem;
             margin-bottom: 0.5rem;
         }
+        div[data-testid="stVerticalBlock"]:has(.lista-pedidos-marker) .stRadio > div {
+            max-height: min(58vh, 540px);
+            overflow-y: auto;
+            padding: 0.85rem 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #f8fafc;
+        }
+        div[data-testid="stVerticalBlock"]:has(.lista-pedidos-marker) .stRadio > div::-webkit-scrollbar {
+            width: 8px;
+        }
+        div[data-testid="stVerticalBlock"]:has(.lista-pedidos-marker) .stRadio > div::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .painel-selecao-lateral {
+            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 1.15rem 1.25rem;
+            position: sticky;
+            top: 1.25rem;
+        }
+        .painel-selecao-lateral .painel-selecao-titulo {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #1e3a5f;
+            margin-bottom: 0.85rem;
+        }
+        .painel-selecao-lateral .pedido-resumo-h {
+            flex-direction: column;
+            margin-top: 0;
+            margin-bottom: 0.75rem;
+        }
+        .painel-selecao-lateral .pedido-card,
+        .painel-selecao-lateral .pedido-card-wide {
+            min-width: 0;
+            flex: none;
+        }
         .secao-titulo {
             color: #1e3a5f;
             margin-bottom: 0.75rem;
+        }
+        .step-row { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        div[data-testid="column"] .step { margin-bottom: 0.25rem; }
+        div[data-testid="stHorizontalBlock"]:has(.step) {
+            margin-top: 1.5rem;
+            margin-bottom: 1.25rem;
+        }
+        .alcoano-fluxo .alcoano-wrap {
+            margin: 0.35rem 0 0.75rem 0;
+            gap: 0.6rem;
+            align-items: center;
+            max-width: 820px;
+        }
+        .alcoano-fluxo .alcoano-avatar {
+            width: 36px;
+            height: 36px;
+            border-width: 1px;
+            box-shadow: 0 2px 6px rgba(30, 58, 95, 0.18);
+        }
+        .alcoano-fluxo .alcoano-bubble {
+            flex: 1;
+            padding: 0.55rem 0.8rem;
+            font-size: 0.86rem;
+            line-height: 1.45;
+            border-radius: 10px;
+            box-shadow: none;
+        }
+        .alcoano-fluxo .alcoano-nome {
+            font-size: 0.72rem;
+            margin-bottom: 0.15rem;
         }
         .step {
             flex: 1;
@@ -232,12 +378,12 @@ def _inicializar_estado() -> None:
             st.session_state[chave] = valor
 
 
-def _render_passos(passo: int) -> None:
+def _render_cabecalho_fluxo(passo: int, sucesso: bool = False) -> None:
     nomes = ["1 · Buscar pedido", "2 · Escolher linha", "3 · Preencher e enviar"]
     cols = st.columns(3)
     for idx, (col, nome) in enumerate(zip(cols, nomes), start=1):
         classe = "step"
-        if idx < passo:
+        if sucesso or idx < passo:
             classe += " done"
             icone = "✓ "
         elif idx == passo:
@@ -250,6 +396,13 @@ def _render_passos(passo: int) -> None:
                 f'<div class="{classe}">{icone}{nome}</div>',
                 unsafe_allow_html=True,
             )
+
+    st.markdown('<div class="alcoano-fluxo">', unsafe_allow_html=True)
+    if sucesso:
+        render_mensagem_sucesso()
+    else:
+        render_mensagem_passo(passo)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _filtrar_linhas(linhas: list[dict], termo: str) -> list[dict]:
@@ -291,13 +444,35 @@ def _render_resumo_pedido(linha: dict, rotulo_po: str = "PO com Release") -> Non
     )
 
 
-def _render_painel_ajuda(passo: int, incluir_dicas: bool = False) -> None:
-    st.markdown('<div class="painel-ajuda">', unsafe_allow_html=True)
-    render_mensagem_passo(passo)
-    if incluir_dicas:
-        render_dicas_formulario()
-    render_faq()
-    st.markdown("</div>", unsafe_allow_html=True)
+def _render_sidebar() -> None:
+    with st.sidebar:
+        st.markdown(
+            """
+            <div class="sidebar-brand">
+                <span class="sidebar-brand-icon">📋</span>
+                <div>
+                    <div class="sidebar-brand-title">Fornecedores</div>
+                    <div class="sidebar-brand-sub">Formulário Alcoa</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown('<p class="sidebar-nav-label">Navegação</p>', unsafe_allow_html=True)
+        secao = st.radio(
+            "Menu",
+            ["💡 Dicas", "❓ FAQ"],
+            label_visibility="collapsed",
+            key="sidebar_menu",
+        )
+
+        st.divider()
+
+        if secao.startswith("💡"):
+            render_dicas_formulario()
+        else:
+            render_faq()
 
 
 def _formatar_valor_detalhe(campo: str, valor) -> str:
@@ -360,18 +535,6 @@ def _aplicar_link_direto() -> None:
 
 _inicializar_estado()
 
-st.markdown(
-    """
-    <div class="hero">
-        <div class="hero-text">
-            <h1>📋 Formulário de Fornecedores</h1>
-            <p>Confirme seu pedido e informe a data de entrega em poucos passos.</p>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
 _pasta_app = Path(__file__).resolve().parent
 _fup_local = _pasta_app / "relatorio_fup.xlsm"
 if _fup_local.is_file():
@@ -425,9 +588,12 @@ if (
         f"| Linha **{linha_link['numero_linha']}**"
     )
 
-if st.session_state.envio_sucesso and st.session_state.ultimo_registro:
+_sucesso = bool(st.session_state.envio_sucesso and st.session_state.ultimo_registro)
+_render_sidebar()
+
+if _sucesso:
     reg = st.session_state.ultimo_registro
-    render_mensagem_sucesso()
+    _render_cabecalho_fluxo(3, sucesso=True)
     st.markdown(
         """
         <div class="sucesso-box">
@@ -455,17 +621,14 @@ if st.session_state.envio_sucesso and st.session_state.ultimo_registro:
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
-    render_faq()
     if st.button("➕ Enviar nova resposta", type="primary", use_container_width=True):
         _resetar_fluxo()
         st.rerun()
     st.stop()
 
-_render_passos(st.session_state.passo)
+_render_cabecalho_fluxo(st.session_state.passo)
 
-col_conteudo, col_ajuda = st.columns([7, 3], gap="large")
-
-with col_conteudo:
+with st.container():
 
     # ── PASSO 1: Busca ──────────────────────────────────────────────────────
     if st.session_state.passo == 1:
@@ -525,44 +688,63 @@ with col_conteudo:
             )
             linhas_disponiveis = _filtrar_linhas(linhas_disponiveis, filtro)
 
-        if len(linhas_disponiveis) == 1:
-            st.session_state.linha_selecionada = linhas_disponiveis[0]
-            st.success("Pedido identificado automaticamente.")
-        else:
-            opcoes = {rotulo_linha(linha): linha for linha in linhas_disponiveis}
-            if opcoes:
+        col_lista, col_detalhe = st.columns([3, 2], gap="large")
+
+        with col_lista:
+            if len(linhas_disponiveis) == 1:
+                st.session_state.linha_selecionada = linhas_disponiveis[0]
+                st.success("Pedido identificado automaticamente.")
+            elif linhas_disponiveis:
+                opcoes = {rotulo_linha(linha): linha for linha in linhas_disponiveis}
+                st.markdown('<div class="lista-pedidos-marker"></div>', unsafe_allow_html=True)
+                st.caption("Clique no pedido correto:")
                 escolha = st.radio(
-                    "Clique no pedido correto:",
+                    "Pedidos",
                     list(opcoes.keys()),
                     label_visibility="collapsed",
                 )
                 st.session_state.linha_selecionada = opcoes[escolha]
+            else:
+                st.session_state.linha_selecionada = None
+                st.warning("Nenhum resultado com esse filtro.")
 
-        if st.session_state.linha_selecionada:
-            linha = st.session_state.linha_selecionada
-            st.divider()
-            _render_resumo_pedido(linha)
+        with col_detalhe:
+            if st.session_state.linha_selecionada:
+                linha = st.session_state.linha_selecionada
+                st.markdown('<div class="painel-selecao-lateral">', unsafe_allow_html=True)
+                st.markdown(
+                    '<p class="painel-selecao-titulo">📌 Pedido selecionado</p>',
+                    unsafe_allow_html=True,
+                )
+                _render_resumo_pedido(linha)
 
-            if linha.get("descricao_item"):
-                st.caption(f"📦 {linha['descricao_item']}")
+                if linha.get("descricao_item"):
+                    st.caption(f"📦 {linha['descricao_item']}")
 
-            col_voltar, col_avancar = st.columns(2)
-            with col_voltar:
-                if st.button("← Voltar", use_container_width=True):
+                col_voltar, col_avancar = st.columns(2)
+                with col_voltar:
+                    if st.button("← Voltar", use_container_width=True, key="voltar_passo2"):
+                        st.session_state.passo = 1
+                        st.session_state.linha_selecionada = None
+                        st.rerun()
+                with col_avancar:
+                    if st.button(
+                        "Continuar →",
+                        type="primary",
+                        use_container_width=True,
+                        key="avancar_passo2",
+                    ):
+                        st.session_state.passo = 3
+                        st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+            elif not linhas_disponiveis:
+                st.markdown('<div class="painel-selecao-lateral">', unsafe_allow_html=True)
+                st.info("Ajuste o filtro ou volte para fazer uma nova busca.")
+                if st.button("← Voltar à busca", use_container_width=True, key="voltar_busca_vazio"):
                     st.session_state.passo = 1
                     st.session_state.linha_selecionada = None
                     st.rerun()
-            with col_avancar:
-                if st.button("Continuar para o formulário →", type="primary", use_container_width=True):
-                    st.session_state.passo = 3
-                    st.rerun()
-        elif linhas_disponiveis:
-            st.warning("Nenhum resultado com esse filtro.")
-        else:
-            st.warning("Nenhuma linha disponível.")
-            if st.button("← Voltar à busca"):
-                st.session_state.passo = 1
-                st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
     # ── PASSO 3: Formulário ─────────────────────────────────────────────────
     elif st.session_state.passo == 3 and st.session_state.linha_selecionada:
@@ -672,9 +854,3 @@ with col_conteudo:
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Erro ao salvar: {exc}")
-
-with col_ajuda:
-    _render_painel_ajuda(
-        st.session_state.passo,
-        incluir_dicas=st.session_state.passo == 3,
-    )
