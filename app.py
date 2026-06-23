@@ -377,7 +377,7 @@ else:
         garantir_arquivo_fup()
     except Exception as exc:
         mensagem = str(exc)
-        if "11001" in mensagem or "getaddrinfo" in mensagem.lower():
+        if "11001" in mensagem or "getaddrinfo" in mensagem.lower() or "name or service not known" in mensagem.lower():
             st.error(
                 "Não foi possível conectar ao Supabase (rede da empresa pode bloquear). "
                 "Coloque o arquivo **relatorio_fup.xlsm** na pasta do projeto e reinicie o app."

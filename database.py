@@ -16,16 +16,21 @@ _client: Client | None = None
 
 
 def _ler_config(chave: str, padrao: str = "") -> str:
+    try:
+        import streamlit as st
+        from streamlit.runtime.scriptrunner_utils.script_run_context import (
+            get_script_run_ctx,
+        )
+
+        if get_script_run_ctx() is not None and hasattr(st, "secrets"):
+            if chave in st.secrets:
+                return str(st.secrets[chave]).strip()
+    except Exception:
+        pass
+
     valor = os.getenv(chave, "").strip()
     if valor:
         return valor
-    try:
-        import streamlit as st
-
-        if hasattr(st, "secrets") and chave in st.secrets:
-            return str(st.secrets[chave]).strip()
-    except Exception:
-        pass
     return padrao
 
 
@@ -95,10 +100,25 @@ def get_client() -> Client:
 
 
 def baixar_fup_storage(destino: Path) -> None:
+    url = supabase_url()
+    if not url.startswith("https://") or "supabase.co" not in url:
+        raise ValueError(
+            f"SUPABASE_URL inválida: {url!r}. "
+            "Use o Project URL copiado do painel Supabase."
+        )
     client = get_client()
     bucket = supabase_storage_bucket()
     arquivo = supabase_fup_file()
-    dados = client.storage.from_(bucket).download(arquivo)
+    try:
+        dados = client.storage.from_(bucket).download(arquivo)
+    except Exception as exc:
+        mensagem = str(exc)
+        if "11001" in mensagem or "getaddrinfo" in mensagem.lower() or "name or service not known" in mensagem.lower():
+            raise RuntimeError(
+                f"Não foi possível conectar ao Supabase em {url}. "
+                "Confira SUPABASE_URL nos Secrets (copie do painel, sem digitar)."
+            ) from exc
+        raise
     destino.write_bytes(dados)
 
 
