@@ -316,8 +316,9 @@ st.caption(
 if supabase_configurado():
     try:
         criar_tabela()
+        st.caption("Dados carregados do Supabase.")
     except RuntimeError as exc:
-        st.warning(f"Supabase com erro: {exc}. Exibindo dados do Excel.")
+        st.warning(f"Supabase com erro: {exc}. Tentando exibir dados do Excel.")
 else:
     st.info("Exibindo respostas salvas em `formulario_respostas.xlsx`.")
 

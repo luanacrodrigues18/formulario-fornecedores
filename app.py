@@ -8,7 +8,13 @@ import streamlit as st
 
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
-from database import COLUNAS_EXIBICAO, formatar_datetime, validar_registro
+from database import (
+    COLUNAS_EXIBICAO,
+    buscar_resposta_por_po_linha,
+    formatar_datetime,
+    salvar_registro,
+    validar_registro,
+)
 from alcoano import (
     ALCOANO_CSS,
     help_campo,
@@ -19,14 +25,12 @@ from alcoano import (
 )
 from planilha import (
     ARQUIVO_FUP,
-    append_resposta_formulario,
     buscar_por_fornecedor,
     buscar_por_po,
     buscar_por_po_e_linha,
     data_promessa_inicial,
     garantir_arquivo_fup,
     listar_fornecedores,
-    resposta_existe,
     rotulo_linha,
 )
 import planilha as planilha_mod
@@ -564,7 +568,7 @@ with col_conteudo:
     elif st.session_state.passo == 3 and st.session_state.linha_selecionada:
         linha = st.session_state.linha_selecionada
 
-        resposta_anterior = resposta_existe(
+        resposta_anterior = buscar_resposta_por_po_linha(
             linha["numero_po_com_release"],
             linha["numero_linha"],
         )
@@ -649,7 +653,9 @@ with col_conteudo:
             }
 
             erros = validar_registro(dados)
-            if resposta_existe(linha["numero_po_com_release"], linha["numero_linha"]):
+            if buscar_resposta_por_po_linha(
+                linha["numero_po_com_release"], linha["numero_linha"]
+            ):
                 st.error(
                     "Já existe uma resposta para este PO e linha. "
                     "Atualize a página ou entre em contato com a equipe Alcoa."
@@ -659,7 +665,7 @@ with col_conteudo:
                     st.error(erro)
             else:
                 try:
-                    registro = append_resposta_formulario(dados)
+                    registro = salvar_registro(dados)
                     st.session_state.ultimo_registro = registro
                     st.session_state.envio_sucesso = True
                     st.balloons()

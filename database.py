@@ -74,6 +74,18 @@ CAMPOS_OBRIGATORIOS = [
     "numero_linha",
 ]
 
+CAMPOS_TABELA = [
+    "hora_inicio",
+    "hora_conclusao",
+    "email",
+    "nome",
+    "numero_po_com_release",
+    "data_promessa",
+    "observacoes_coleta",
+    "numero_nf",
+    "numero_linha",
+]
+
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
@@ -159,6 +171,25 @@ def inserir_registro_local(dados: dict[str, Any]) -> dict[str, Any]:
     return registro
 
 
+def _dados_para_supabase(dados: dict[str, Any]) -> dict[str, Any]:
+    return {campo: dados[campo] for campo in CAMPOS_TABELA if campo in dados}
+
+
+def _chave_po_linha(numero_po: str, numero_linha: str) -> tuple[str, str]:
+    return str(numero_po or "").strip().lower(), str(numero_linha or "").strip().lower()
+
+
+def _buscar_supabase() -> list[dict[str, Any]]:
+    client = get_client()
+    response = (
+        client.table(supabase_table())
+        .select("*")
+        .order("id", desc=True)
+        .execute()
+    )
+    return response.data or []
+
+
 def buscar_locais() -> list[dict[str, Any]]:
     return list(reversed(_carregar_locais()))
 
@@ -171,24 +202,58 @@ def inserir_registro(dados: dict[str, Any]) -> dict[str, Any]:
     return response.data[0]
 
 
+def salvar_registro(dados: dict[str, Any]) -> dict[str, Any]:
+    if supabase_configurado():
+        return inserir_registro(_dados_para_supabase(dados))
+
+    from planilha import append_resposta_formulario
+
+    return append_resposta_formulario(dados)
+
+
+def buscar_resposta_por_po_linha(
+    numero_po: str, numero_linha: str
+) -> dict[str, Any] | None:
+    chave = _chave_po_linha(numero_po, numero_linha)
+
+    if supabase_configurado():
+        try:
+            for registro in _buscar_supabase():
+                if _chave_po_linha(
+                    registro.get("numero_po_com_release", ""),
+                    registro.get("numero_linha", ""),
+                ) == chave:
+                    return registro
+        except Exception:
+            pass
+
+    from planilha import carregar_respostas
+
+    for registro in carregar_respostas():
+        if _chave_po_linha(
+            registro.get("numero_po_com_release", ""),
+            registro.get("numero_linha", ""),
+        ) == chave:
+            return registro
+    return None
+
+
 def buscar_todos() -> list[dict[str, Any]]:
+    if supabase_configurado():
+        try:
+            registros = _buscar_supabase()
+            if registros:
+                return registros
+        except Exception:
+            pass
+
     from planilha import carregar_respostas
 
     respostas_excel = carregar_respostas()
     if respostas_excel:
         return respostas_excel
 
-    if not supabase_configurado():
-        return buscar_locais()
-
-    client = get_client()
-    response = (
-        client.table(supabase_table())
-        .select("*")
-        .order("id", desc=True)
-        .execute()
-    )
-    return response.data or []
+    return buscar_locais()
 
 
 def valor_vazio(valor: Any) -> bool:
