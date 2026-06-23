@@ -24,6 +24,7 @@ from planilha import (
     buscar_por_po,
     buscar_por_po_e_linha,
     data_promessa_inicial,
+    garantir_arquivo_fup,
     listar_fornecedores,
     resposta_existe,
     rotulo_linha,
@@ -366,8 +367,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+try:
+    garantir_arquivo_fup()
+except Exception as exc:
+    st.error(f"Erro ao carregar planilha base: {exc}")
+    st.stop()
+
 if not ARQUIVO_FUP.exists():
-    st.error(f"Arquivo base não encontrado: {ARQUIVO_FUP.name}")
+    st.error(
+        f"Arquivo base não encontrado: {ARQUIVO_FUP.name}. "
+        "Coloque o arquivo na pasta do projeto ou configure o Supabase Storage."
+    )
     st.stop()
 
 try:

@@ -82,6 +82,19 @@ def _linha_para_registro(indice: int, linha: tuple[Any, ...]) -> dict[str, Any]:
     }
 
 
+def garantir_arquivo_fup() -> None:
+    if ARQUIVO_FUP.exists():
+        return
+
+    from database import baixar_fup_storage, supabase_configurado
+
+    if not supabase_configurado():
+        return
+
+    baixar_fup_storage(ARQUIVO_FUP)
+    carregar_base_fup.cache_clear()
+
+
 @lru_cache(maxsize=1)
 def carregar_base_fup() -> list[dict[str, Any]]:
     if not ARQUIVO_FUP.exists():

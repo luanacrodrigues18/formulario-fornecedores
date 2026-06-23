@@ -15,6 +15,8 @@ ARQUIVO_LOCAL = Path(__file__).parent / "dados_locais.json"
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 SUPABASE_TABLE = os.getenv("SUPABASE_TABLE", "formulario")
+SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "Form")
+SUPABASE_FUP_FILE = os.getenv("SUPABASE_FUP_FILE", "relatorio_fup.xlsm")
 
 _client: Client | None = None
 
@@ -60,6 +62,12 @@ def get_client() -> Client:
             )
         _client = create_client(SUPABASE_URL, SUPABASE_KEY)
     return _client
+
+
+def baixar_fup_storage(destino: Path) -> None:
+    client = get_client()
+    dados = client.storage.from_(SUPABASE_STORAGE_BUCKET).download(SUPABASE_FUP_FILE)
+    destino.write_bytes(dados)
 
 
 def criar_tabela() -> bool:
