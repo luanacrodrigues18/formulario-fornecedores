@@ -206,6 +206,22 @@ def salvar_registro(dados: dict[str, Any]) -> dict[str, Any]:
     if supabase_configurado():
         return inserir_registro(_dados_para_supabase(dados))
 
+    try:
+        import streamlit as st
+        from streamlit.runtime.scriptrunner_utils.script_run_context import (
+            get_script_run_ctx,
+        )
+
+        if get_script_run_ctx() is not None:
+            raise RuntimeError(
+                "Supabase não configurado nos Secrets deste app. "
+                "Adicione SUPABASE_URL e SUPABASE_KEY e salve novamente."
+            )
+    except RuntimeError:
+        raise
+    except Exception:
+        pass
+
     from planilha import append_resposta_formulario
 
     return append_resposta_formulario(dados)
@@ -241,9 +257,7 @@ def buscar_resposta_por_po_linha(
 def buscar_todos() -> list[dict[str, Any]]:
     if supabase_configurado():
         try:
-            registros = _buscar_supabase()
-            if registros:
-                return registros
+            return _buscar_supabase()
         except Exception:
             pass
 
