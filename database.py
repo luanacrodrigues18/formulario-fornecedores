@@ -12,13 +12,41 @@ load_dotenv()
 
 ARQUIVO_LOCAL = Path(__file__).parent / "dados_locais.json"
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
-SUPABASE_TABLE = os.getenv("SUPABASE_TABLE", "formulario")
-SUPABASE_STORAGE_BUCKET = os.getenv("SUPABASE_STORAGE_BUCKET", "Form")
-SUPABASE_FUP_FILE = os.getenv("SUPABASE_FUP_FILE", "relatorio_fup.xlsm")
-
 _client: Client | None = None
+
+
+def _ler_config(chave: str, padrao: str = "") -> str:
+    valor = os.getenv(chave, "").strip()
+    if valor:
+        return valor
+    try:
+        import streamlit as st
+
+        if hasattr(st, "secrets") and chave in st.secrets:
+            return str(st.secrets[chave]).strip()
+    except Exception:
+        pass
+    return padrao
+
+
+def supabase_url() -> str:
+    return _ler_config("SUPABASE_URL")
+
+
+def supabase_key() -> str:
+    return _ler_config("SUPABASE_KEY")
+
+
+def supabase_table() -> str:
+    return _ler_config("SUPABASE_TABLE", "formulario")
+
+
+def supabase_storage_bucket() -> str:
+    return _ler_config("SUPABASE_STORAGE_BUCKET", "Form")
+
+
+def supabase_fup_file() -> str:
+    return _ler_config("SUPABASE_FUP_FILE", "relatorio_fup.xlsm")
 
 COLUNAS_EXIBICAO = {
     "id": "ID",
@@ -50,23 +78,27 @@ def email_valido(email: str) -> bool:
 
 
 def supabase_configurado() -> bool:
-    return bool(SUPABASE_URL.strip() and SUPABASE_KEY.strip())
+    return bool(supabase_url() and supabase_key())
 
 
 def get_client() -> Client:
     global _client
+    url = supabase_url()
+    key = supabase_key()
     if _client is None:
-        if not SUPABASE_URL or not SUPABASE_KEY:
+        if not url or not key:
             raise ValueError(
-                "Configure SUPABASE_URL e SUPABASE_KEY no arquivo .env"
+                "Configure SUPABASE_URL e SUPABASE_KEY no .env ou nos Secrets do Streamlit."
             )
-        _client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        _client = create_client(url, key)
     return _client
 
 
 def baixar_fup_storage(destino: Path) -> None:
     client = get_client()
-    dados = client.storage.from_(SUPABASE_STORAGE_BUCKET).download(SUPABASE_FUP_FILE)
+    bucket = supabase_storage_bucket()
+    arquivo = supabase_fup_file()
+    dados = client.storage.from_(bucket).download(arquivo)
     destino.write_bytes(dados)
 
 
@@ -77,11 +109,11 @@ def criar_tabela() -> bool:
     """
     try:
         client = get_client()
-        client.table(SUPABASE_TABLE).select("id").limit(1).execute()
+        client.table(supabase_table()).select("id").limit(1).execute()
         return True
     except Exception as exc:
         raise RuntimeError(
-            f"Tabela '{SUPABASE_TABLE}' não encontrada ou inacessível. "
+            f"Tabela '{supabase_table()}' não encontrada ou inacessível. "
             "Execute o SQL do README no painel Supabase. "
             f"Detalhe: {exc}"
         ) from exc
@@ -113,7 +145,7 @@ def buscar_locais() -> list[dict[str, Any]]:
 
 def inserir_registro(dados: dict[str, Any]) -> dict[str, Any]:
     client = get_client()
-    response = client.table(SUPABASE_TABLE).insert(dados).execute()
+    response = client.table(supabase_table()).insert(dados).execute()
     if not response.data:
         raise RuntimeError("Não foi possível inserir o registro.")
     return response.data[0]
@@ -131,7 +163,7 @@ def buscar_todos() -> list[dict[str, Any]]:
 
     client = get_client()
     response = (
-        client.table(SUPABASE_TABLE)
+        client.table(supabase_table())
         .select("*")
         .order("id", desc=True)
         .execute()

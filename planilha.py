@@ -24,7 +24,7 @@ def _load_workbook(caminho: Path | str, **kwargs):
         return load_workbook(caminho, **kwargs)
 
 BASE_DIR = Path(__file__).parent
-ARQUIVO_FUP = BASE_DIR / "Relatório - FUP.xlsm"
+ARQUIVO_FUP = BASE_DIR / "relatorio_fup.xlsm"
 ARQUIVO_RESPOSTAS = BASE_DIR / "formulario_respostas.xlsx"
 
 ABA_BASE = "Follow-up-Release"
@@ -86,12 +86,19 @@ def garantir_arquivo_fup() -> None:
     if ARQUIVO_FUP.exists():
         return
 
-    from database import baixar_fup_storage, supabase_configurado
+    from database import baixar_fup_storage, supabase_configurado, supabase_fup_file, supabase_storage_bucket
 
     if not supabase_configurado():
-        return
+        raise RuntimeError(
+            "Planilha base não encontrada e Supabase não configurado. "
+            "Adicione SUPABASE_URL e SUPABASE_KEY no .env (local) ou nos Secrets (Streamlit Cloud)."
+        )
 
     baixar_fup_storage(ARQUIVO_FUP)
+    if not ARQUIVO_FUP.exists():
+        raise RuntimeError(
+            f"Não foi possível baixar {supabase_fup_file()} do bucket {supabase_storage_bucket()}."
+        )
     carregar_base_fup.cache_clear()
 
 
