@@ -23,7 +23,7 @@ def _load_workbook(caminho: Path | str, **kwargs):
         warnings.simplefilter("ignore", UserWarning)
         return load_workbook(caminho, **kwargs)
 
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).resolve().parent
 ARQUIVO_FUP = BASE_DIR / "relatorio_fup.xlsm"
 ARQUIVO_RESPOSTAS = BASE_DIR / "formulario_respostas.xlsx"
 
@@ -82,19 +82,48 @@ def _linha_para_registro(indice: int, linha: tuple[Any, ...]) -> dict[str, Any]:
     }
 
 
+def _localizar_fup() -> Path | None:
+    candidatos = [
+        BASE_DIR / "relatorio_fup.xlsm",
+        BASE_DIR / "Relatório - FUP.xlsm",
+    ]
+    for caminho in candidatos:
+        if caminho.is_file():
+            return caminho
+    for caminho in BASE_DIR.glob("*.xlsm"):
+        if "fup" in caminho.name.lower():
+            return caminho
+    return None
+
+
 def garantir_arquivo_fup() -> None:
-    if ARQUIVO_FUP.exists():
+    global ARQUIVO_FUP
+
+    local = _localizar_fup()
+    if local:
+        ARQUIVO_FUP = local
         return
 
-    from database import baixar_fup_storage, supabase_configurado, supabase_fup_file, supabase_storage_bucket
+    from database import baixar_fup_storage, supabase_configurado, supabase_fup_file, supabase_storage_bucket, supabase_url
 
     if not supabase_configurado():
         raise RuntimeError(
             "Planilha base não encontrada e Supabase não configurado. "
-            "Adicione SUPABASE_URL e SUPABASE_KEY no .env (local) ou nos Secrets (Streamlit Cloud)."
+            "Coloque relatorio_fup.xlsm na pasta do projeto ou configure os Secrets."
         )
 
-    baixar_fup_storage(ARQUIVO_FUP)
+    try:
+        baixar_fup_storage(ARQUIVO_FUP)
+    except Exception as exc:
+        mensagem = str(exc)
+        if "11001" in mensagem or "getaddrinfo" in mensagem.lower():
+            raise RuntimeError(
+                "Não foi possível conectar ao Supabase (rede bloqueada ou URL incorreta). "
+                f"URL configurada: {supabase_url()}. "
+                "No PC, coloque relatorio_fup.xlsm na pasta do projeto."
+            ) from exc
+        raise
+
     if not ARQUIVO_FUP.exists():
         raise RuntimeError(
             f"Não foi possível baixar {supabase_fup_file()} do bucket {supabase_storage_bucket()}."

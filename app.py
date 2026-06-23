@@ -29,6 +29,7 @@ from planilha import (
     resposta_existe,
     rotulo_linha,
 )
+import planilha as planilha_mod
 
 st.set_page_config(
     page_title="Formulário de Fornecedores",
@@ -367,15 +368,27 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-try:
-    garantir_arquivo_fup()
-except Exception as exc:
-    st.error(f"Erro ao carregar planilha base: {exc}")
-    st.stop()
+_pasta_app = Path(__file__).resolve().parent
+_fup_local = _pasta_app / "relatorio_fup.xlsm"
+if _fup_local.is_file():
+    planilha_mod.ARQUIVO_FUP = _fup_local
+else:
+    try:
+        garantir_arquivo_fup()
+    except Exception as exc:
+        mensagem = str(exc)
+        if "11001" in mensagem or "getaddrinfo" in mensagem.lower():
+            st.error(
+                "Não foi possível conectar ao Supabase (rede da empresa pode bloquear). "
+                "Coloque o arquivo **relatorio_fup.xlsm** na pasta do projeto e reinicie o app."
+            )
+        else:
+            st.error(f"Erro ao carregar planilha base: {exc}")
+        st.stop()
 
-if not ARQUIVO_FUP.exists():
+if not planilha_mod.ARQUIVO_FUP.exists():
     st.error(
-        f"Arquivo base não encontrado: {ARQUIVO_FUP.name}. "
+        f"Arquivo base não encontrado: {planilha_mod.ARQUIVO_FUP.name}. "
         "Coloque o arquivo na pasta do projeto ou configure o Supabase Storage."
     )
     st.stop()
