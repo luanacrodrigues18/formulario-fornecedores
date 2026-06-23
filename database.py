@@ -1,7 +1,8 @@
 import json
 import os
 import re
-from datetime import datetime
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any
 
@@ -308,13 +309,32 @@ def validar_registro(dados: dict[str, Any]) -> list[str]:
     return erros
 
 
-def formatar_datetime(valor: Any) -> str:
+FUSO_BRASIL = ZoneInfo("America/Sao_Paulo")
+
+
+def agora_brasil() -> datetime:
+    return datetime.now(FUSO_BRASIL)
+
+
+def parse_datetime(valor: Any) -> datetime | None:
     if valor is None:
-        return ""
+        return None
     if isinstance(valor, datetime):
-        return valor.strftime("%d/%m/%Y %H:%M:%S")
-    try:
-        dt = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
-        return dt.strftime("%d/%m/%Y %H:%M:%S")
-    except ValueError:
-        return str(valor)
+        dt = valor
+    elif isinstance(valor, date):
+        dt = datetime.combine(valor, datetime.min.time())
+    else:
+        try:
+            dt = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    return dt.astimezone(FUSO_BRASIL)
+
+
+def formatar_datetime(valor: Any) -> str:
+    dt = parse_datetime(valor)
+    if dt is None:
+        return "" if valor is None else str(valor)
+    return dt.strftime("%d/%m/%Y %H:%M:%S")
