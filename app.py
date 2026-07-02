@@ -25,8 +25,6 @@ from alcoano import (
 )
 from planilha import (
     ARQUIVO_FUP,
-    buscar_por_fornecedor,
-    buscar_por_po,
     buscar_por_po_e_linha,
     data_promessa_inicial,
     garantir_arquivo_fup,
@@ -34,6 +32,15 @@ from planilha import (
     rotulo_linha,
 )
 import planilha as planilha_mod
+from auth_fornecedor import (
+    autenticado,
+    codigo_atual,
+    filtrar_linhas_do_fornecedor,
+    fornecedor_atual,
+    linhas_do_fornecedor_logado,
+    render_resumo_sessao_sidebar,
+    render_tela_login,
+)
 
 st.set_page_config(
     page_title="Formulário de Fornecedores",
@@ -355,6 +362,41 @@ st.markdown(
             border-radius: 10px;
             overflow: hidden;
         }
+        .login-box {
+            background: linear-gradient(135deg, #eef4fb 0%, #f8fafc 100%);
+            border: 1px solid #b8cfe8;
+            border-radius: 16px;
+            padding: 1.75rem 2rem;
+            max-width: 520px;
+            margin: 2rem auto 1.5rem auto;
+            text-align: center;
+        }
+        .login-box h2 { color: #1e3a5f; margin: 0 0 0.5rem 0; }
+        .login-box p { color: #475569; margin: 0; }
+        [data-testid="stSidebar"] .sidebar-fornecedor {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 0.75rem 0.85rem;
+            margin-bottom: 0.75rem;
+        }
+        [data-testid="stSidebar"] .sidebar-fornecedor-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #94a3b8;
+        }
+        [data-testid="stSidebar"] .sidebar-fornecedor-nome {
+            color: #f8fafc;
+            font-weight: 700;
+            font-size: 0.92rem;
+            margin-top: 0.15rem;
+        }
+        [data-testid="stSidebar"] .sidebar-fornecedor-codigo {
+            color: #cbd5e1;
+            font-size: 0.8rem;
+            margin-top: 0.1rem;
+        }
         """
         + ALCOANO_CSS
         + """
@@ -469,6 +511,8 @@ def _render_sidebar() -> None:
 
         st.divider()
 
+        render_resumo_sessao_sidebar()
+
         if secao.startswith("💡"):
             render_dicas_formulario()
         else:
@@ -520,7 +564,7 @@ def _aplicar_link_direto() -> None:
     if not po_link or not linha_link:
         return
 
-    linhas = buscar_por_po_e_linha(po_link, linha_link)
+    linhas = filtrar_linhas_do_fornecedor(buscar_por_po_e_linha(po_link, linha_link))
     st.session_state.link_processado = True
 
     if len(linhas) == 1:
@@ -561,9 +605,14 @@ if not planilha_mod.ARQUIVO_FUP.exists():
     st.stop()
 
 try:
-    fornecedores = listar_fornecedores()
+    listar_fornecedores()
 except Exception as exc:
     st.error(f"Erro ao ler a aba Follow-up-Release: {exc}")
+    st.stop()
+
+if not autenticado():
+    _render_sidebar()
+    render_tela_login()
     st.stop()
 
 _aplicar_link_direto()
@@ -632,48 +681,45 @@ with st.container():
 
     # ── PASSO 1: Busca ──────────────────────────────────────────────────────
     if st.session_state.passo == 1:
-        st.markdown("### 🔍 Encontre seu pedido")
+        st.markdown(f"### 👋 Olá, **{fornecedor_atual()}**")
+        st.caption(f"Código do fornecedor: **{codigo_atual()}**")
+
+        minhas_linhas = linhas_do_fornecedor_logado()
+        st.info(f"Você tem **{len(minhas_linhas)}** pedido(s) vinculado(s) ao seu código.")
 
         st.markdown('<div class="busca-horizontal">', unsafe_allow_html=True)
-        col_forn, col_po = st.columns(2)
-        linhas_disponiveis: list[dict] = []
-        fornecedor = ""
-        numero_po_busca = ""
-
-        with col_forn:
-            st.markdown("**🏢 Por Fornecedor**")
-            fornecedor = st.selectbox(
-                "Selecione sua empresa",
-                [""] + fornecedores,
-                placeholder="Digite para buscar...",
-                label_visibility="collapsed",
-            )
-            if fornecedor:
-                linhas_disponiveis = buscar_por_fornecedor(fornecedor)
-
-        with col_po:
-            st.markdown("**📄 Por PO com Release**")
-            numero_po_busca = st.text_input(
-                "Número do PO com Release",
-                placeholder="Ex: 4133600-23",
-                help=help_campo("po"),
-                label_visibility="collapsed",
-            )
-            if numero_po_busca.strip() and not fornecedor:
-                linhas_disponiveis = buscar_por_po(numero_po_busca)
-
+        numero_po_busca = st.text_input(
+            "📄 Buscar por PO com Release",
+            placeholder="Ex: 4133600-23",
+            help=help_campo("po"),
+        )
         st.markdown("</div>", unsafe_allow_html=True)
+
+        linhas_disponiveis: list[dict] = []
+        termo_po = numero_po_busca.strip().lower()
+        if termo_po:
+            linhas_disponiveis = [
+                linha
+                for linha in minhas_linhas
+                if termo_po in linha["numero_po_com_release"].lower()
+            ]
+        elif st.button("📦 Ver todos os meus pedidos", type="primary", use_container_width=True):
+            st.session_state._linhas_cache = minhas_linhas
+            st.session_state.passo = 2
+            st.rerun()
 
         if linhas_disponiveis:
             st.session_state.passo = 2
             st.session_state._linhas_cache = linhas_disponiveis
             st.rerun()
-        elif fornecedor or numero_po_busca.strip():
-            st.warning("Nenhum pedido encontrado. Verifique os dados e tente novamente.")
+        elif termo_po:
+            st.warning("Nenhum pedido seu encontrado com esse PO. Verifique o código digitado.")
 
     # ── PASSO 2: Escolher linha ─────────────────────────────────────────────
     elif st.session_state.passo == 2:
-        linhas_disponiveis = st.session_state.get("_linhas_cache", [])
+        linhas_disponiveis = filtrar_linhas_do_fornecedor(
+            st.session_state.get("_linhas_cache", [])
+        )
 
         st.markdown("### 📦 Selecione a linha do pedido")
         st.markdown(
@@ -749,6 +795,16 @@ with st.container():
     # ── PASSO 3: Formulário ─────────────────────────────────────────────────
     elif st.session_state.passo == 3 and st.session_state.linha_selecionada:
         linha = st.session_state.linha_selecionada
+        permitidas = {
+            (item["numero_po_com_release"], item["numero_linha"])
+            for item in linhas_do_fornecedor_logado()
+        }
+        if (linha["numero_po_com_release"], linha["numero_linha"]) not in permitidas:
+            st.error("Este pedido não pertence ao seu código de fornecedor.")
+            if st.button("← Voltar", type="primary", use_container_width=True):
+                _resetar_fluxo()
+                st.rerun()
+            st.stop()
 
         resposta_anterior = buscar_resposta_por_po_linha(
             linha["numero_po_com_release"],
@@ -826,6 +882,7 @@ with st.container():
                 "hora_conclusao": datetime.now().isoformat(),
                 "email": email.strip(),
                 "nome": nome.strip(),
+                "codigo_fornecedor": codigo_atual(),
                 "numero_po_com_release": linha["numero_po_com_release"],
                 "data_promessa": data_promessa.isoformat(),
                 "observacoes_coleta": observacoes.strip(),

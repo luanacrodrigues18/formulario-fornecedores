@@ -70,6 +70,8 @@ CREATE TABLE IF NOT EXISTS formulario (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE formulario ADD COLUMN IF NOT EXISTS codigo_fornecedor TEXT;
+
 ALTER TABLE formulario ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Permitir leitura pública"
@@ -84,6 +86,9 @@ WITH CHECK (true);
 > Ajuste as políticas RLS conforme a segurança desejada em produção.
 
 ## Como executar
+
+> **Deploy completo (Supabase + Streamlit Cloud):** veja **[GUIA_IMPLANTACAO.md](GUIA_IMPLANTACAO.md)**.  
+> **Opções para produção real (Azure, AWS, Docker, on-prem, etc.):** veja **[DEPLOY_PRODUCAO.md](DEPLOY_PRODUCAO.md)**.
 
 ### Formulário público
 
