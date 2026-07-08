@@ -8,13 +8,14 @@ Documento de referência para evoluir o **Formulário de Fornecedores** do MVP (
 
 ## 1. O que precisa existir em produção
 
-Este sistema tem **4 peças** que podem ser hospedadas de formas diferentes:
+Este sistema tem **5 peças** que podem ser hospedadas de formas diferentes:
 
 | Peça | Tecnologia atual | Função |
 |---|---|---|
-| **Formulário público** | `app.py` (Streamlit) | Interface para o fornecedor |
+| **Formulário público** | `app.py` + `auth_fornecedor.py` | Login por ID + envio do fornecedor |
 | **Dashboard interno** | `dashboard.py` (Streamlit) | Uso da equipe Alcoa |
-| **Banco de respostas** | Supabase (PostgreSQL) | Armazena envios do formulário |
+| **Banco de respostas** | Supabase (PostgreSQL) | Armazena envios (`formulario`) |
+| **Cadastro de IDs** | `fornecedores_codigos.json` | Mapa `ID → nome` (passo 1) |
 | **Arquivo FUP** | `relatorio_fup.xlsm` | Consulta de PO, linha e fornecedor |
 
 Em produção real, além de “subir o app”, normalmente se exige:
@@ -324,7 +325,9 @@ Integração futura para enviar respostas ao ERP — não substitui o formulári
 
 ---
 
-## 11. Arquivo FUP (`relatorio_fup.xlsm`) em produção
+## 11. Arquivo FUP e cadastro de IDs em produção
+
+### 11.1 Planilha FUP (`relatorio_fup.xlsm`)
 
 | Estratégia | Como funciona | Prós | Contras |
 |---|---|---|---|
@@ -334,23 +337,57 @@ Integração futura para enviar respostas ao ERP — não substitui o formulári
 | **API interna** | Microserviço consulta SAP/Excel | Mais seguro e escalável | Desenvolvimento adicional |
 | **Eliminar Excel** | Dados do FUP vêm de banco/API | Melhor solução de longo prazo | Projeto maior |
 
-**Recomendação produção:** curto prazo = Storage ou share; longo prazo = **API ou view no banco corporativo**.
+### 11.2 Cadastro de fornecedores (IDs)
+
+A FUP **não tem coluna de código**. O MVP usa um arquivo separado:
+
+```
+ID (login) → fornecedores_codigos.json → Nome = coluna FORNECEDOR da FUP
+```
+
+| Estratégia | Como funciona | Quando usar |
+|---|---|---|
+| **JSON local / Storage** (passo 1 atual) | Arquivo gerado por `gerar_codigos_fornecedores.py` | MVP e piloto |
+| **Tabela Supabase `fornecedores`** | `id`, `nome`, `cnpj` opcional | Produção — IDs estáveis |
+| **Master data / SAP** | Código oficial do fornecedor | Longo prazo |
+
+**Recomendação:** curto prazo = JSON no Storage junto com a FUP; médio prazo = **tabela `fornecedores`** no Supabase; longo prazo = código SAP.
+
+Exemplo de evolução SQL:
+
+```sql
+CREATE TABLE IF NOT EXISTS fornecedores (
+  id TEXT PRIMARY KEY,
+  nome TEXT NOT NULL,
+  cnpj TEXT,
+  ativo BOOLEAN DEFAULT true
+);
+```
+
+**Atenção:** regenerar o JSON por ordem alfabética **pode mudar os IDs**. Em produção, use IDs estáveis e não regenere automaticamente.
+
+**Recomendação FUP:** curto prazo = Storage; longo prazo = **API ou view no banco corporativo**.
 
 ---
 
-## 12. Segurança do dashboard em produção
+## 12. Segurança do dashboard e do formulário em produção
 
-O **formulário** pode ser público. O **dashboard não deve**.
+O **formulário** é público, mas exige **login por ID do fornecedor** (isolamento por empresa).  
+O **dashboard** não deve ser público.
 
 | Mecanismo | Onde usar | Esforço |
 |---|---|---|
+| **Login por ID** (já no MVP) | Formulário — só pedidos daquela empresa | Feito |
 | **VPN corporativa** | Dashboard só na rede interna | Baixo (infra) |
 | **Azure AD / SSO** | App Service Easy Auth, proxy OAuth | Médio |
 | **streamlit-authenticator** | Usuário/senha simples no `dashboard.py` | Baixo |
 | **IP allowlist** | Firewall só IPs da Alcoa | Baixo |
-| **App separado não publicado** | URL secreta + auth | Baixo (fraco) |
 
-**Mínimo aceitável em produção:** autenticação corporativa **ou** VPN + dashboard sem URL pública.
+**Mínimo aceitável em produção:**  
+- Formulário: login por ID + coluna `codigo_fornecedor` no banco  
+- Dashboard: autenticação corporativa **ou** VPN  
+
+**Observação de segurança do MVP:** o ID funciona como “senha compartilhada”. Evolua para e-mail + token ou SSO quando o processo for crítico.
 
 ---
 
@@ -534,6 +571,10 @@ API intermediária
 ## 20. Próximos passos sugeridos
 
 ### Fase 1 — Estabilizar o MVP (agora)
+- [x] Login por ID do fornecedor (`auth_fornecedor.py`)
+- [x] Cadastro `fornecedores_codigos.json` gerado da FUP
+- [ ] Coluna `codigo_fornecedor` no Supabase (se ainda não rodou o SQL)
+- [ ] Upload do JSON de códigos no Storage (nuvem)
 - [ ] Supabase Pro ou revisão de RLS
 - [ ] Índice único `PO + linha` no banco
 - [ ] Domínio amigável (mesmo no Streamlit)
@@ -541,13 +582,14 @@ API intermediária
 
 ### Fase 2 — Produção controlada (1–3 meses)
 - [ ] Dockerizar `app.py` e `dashboard.py`
+- [ ] Migrar IDs para tabela `fornecedores` (IDs estáveis / SAP)
 - [ ] Deploy em Azure/AWS aprovado pela TI
 - [ ] Secrets no Key Vault / Secrets Manager
 - [ ] CI/CD e monitoramento
 
 ### Fase 3 — Integração corporativa (6+ meses)
 - [ ] Substituir Excel FUP por API ou banco
-- [ ] SSO corporativo
+- [ ] SSO corporativo no dashboard (e reforço no formulário)
 - [ ] Integração com SAP / follow-up
 - [ ] Avaliar reescrita frontend se o volume crescer
 

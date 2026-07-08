@@ -86,7 +86,7 @@ st.markdown(
         .pedido-card .label {
             display: block;
             font-size: 0.76rem;
-            color: #64748b;
+            color: #64748b !important;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.04em;
@@ -96,7 +96,7 @@ st.markdown(
             display: block;
             font-size: 1.15rem;
             font-weight: 700;
-            color: #1e3a5f;
+            color: #1e3a5f !important;
             line-height: 1.4;
             word-break: break-word;
         }
@@ -231,24 +231,32 @@ st.markdown(
             padding: 1.25rem 1.5rem 0.5rem 1.5rem;
             margin-bottom: 0.5rem;
         }
+        /* Lista e cards: cores fixas (não dependem do tema do Windows) */
         div[data-testid="stVerticalBlock"]:has(.lista-pedidos-marker) .stRadio > div {
             max-height: min(58vh, 540px);
             overflow-y: auto;
             padding: 0.85rem 1rem;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #cbd5e1;
             border-radius: 12px;
-            background: #f8fafc;
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+        div[data-testid="stVerticalBlock"]:has(.lista-pedidos-marker) .stRadio label,
+        div[data-testid="stVerticalBlock"]:has(.lista-pedidos-marker) .stRadio label p,
+        div[data-testid="stVerticalBlock"]:has(.lista-pedidos-marker) .stRadio label span,
+        div[data-testid="stVerticalBlock"]:has(.lista-pedidos-marker) .stRadio [data-testid="stMarkdown"] p {
+            color: #0f172a !important;
         }
         div[data-testid="stVerticalBlock"]:has(.lista-pedidos-marker) .stRadio > div::-webkit-scrollbar {
             width: 8px;
         }
         div[data-testid="stVerticalBlock"]:has(.lista-pedidos-marker) .stRadio > div::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
+            background: #94a3b8;
             border-radius: 4px;
         }
         .painel-selecao-lateral {
-            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
-            border: 1px solid #e2e8f0;
+            background: #f8fafc !important;
+            border: 1px solid #cbd5e1 !important;
             border-radius: 14px;
             padding: 1.15rem 1.25rem;
             position: sticky;
@@ -257,8 +265,19 @@ st.markdown(
         .painel-selecao-lateral .painel-selecao-titulo {
             font-size: 0.95rem;
             font-weight: 700;
-            color: #1e3a5f;
+            color: #1e3a5f !important;
             margin-bottom: 0.85rem;
+        }
+        .pedido-card {
+            background: #eef4fb !important;
+            border: 1px solid #b8cfe8 !important;
+        }
+        .pedido-card .label {
+            color: #64748b !important;
+            opacity: 1 !important;
+        }
+        .pedido-card .valor {
+            color: #1e3a5f !important;
         }
         .painel-selecao-lateral .pedido-resumo-h {
             flex-direction: column;
@@ -269,6 +288,7 @@ st.markdown(
         .painel-selecao-lateral .pedido-card-wide {
             min-width: 0;
             flex: none;
+            width: 100%;
         }
         .secao-titulo {
             color: #1e3a5f;
@@ -344,10 +364,52 @@ st.markdown(
             font-weight: 600;
         }
         div[data-testid="stForm"] {
-            background: #f8fafc;
+            background: #f8fafc !important;
             padding: 1.5rem;
             border-radius: 14px;
             border: 1px solid #e2e8f0;
+            color: #0f172a !important;
+        }
+        div[data-testid="stForm"] label,
+        div[data-testid="stForm"] p,
+        div[data-testid="stForm"] span,
+        div[data-testid="stForm"] [data-testid="stMarkdown"] p,
+        div[data-testid="stForm"] [data-testid="stMarkdown"] strong {
+            color: #0f172a !important;
+        }
+        div[data-testid="stForm"] input,
+        div[data-testid="stForm"] textarea,
+        div[data-testid="stForm"] [data-baseweb="input"] input,
+        div[data-testid="stForm"] [data-baseweb="textarea"] textarea,
+        div[data-testid="stForm"] [data-baseweb="base-input"] {
+            color: #0f172a !important;
+            background-color: #ffffff !important;
+            caret-color: #0f172a !important;
+        }
+        div[data-testid="stForm"] [data-baseweb="input"],
+        div[data-testid="stForm"] [data-baseweb="textarea"] {
+            background-color: #ffffff !important;
+        }
+        /* Área principal: evita texto invisível no Windows dark mode */
+        .stApp [data-testid="stMain"] {
+            color: #0f172a;
+        }
+        .stApp [data-testid="stMain"] h1,
+        .stApp [data-testid="stMain"] h2,
+        .stApp [data-testid="stMain"] h3,
+        .stApp [data-testid="stMain"] p,
+        .stApp [data-testid="stMain"] label,
+        .stApp [data-testid="stMain"] span {
+            color: inherit;
+        }
+        .stApp [data-testid="stMain"] .pedido-card .label {
+            color: #64748b !important;
+            background: transparent !important;
+        }
+        .stApp [data-testid="stMain"] .pedido-card .valor {
+            color: #1e3a5f !important;
+            background: transparent !important;
+            -webkit-text-fill-color: #1e3a5f !important;
         }
         .sucesso-box {
             background: linear-gradient(135deg, #f0fdf4, #dcfce7);
@@ -469,16 +531,16 @@ def _render_resumo_pedido(linha: dict, rotulo_po: str = "PO com Release") -> Non
         f"""
         <div class="pedido-resumo-h">
             <div class="pedido-card">
-                <span class="label">{html.escape(rotulo_po)}</span>
-                <span class="valor">{po}</span>
+                <span class="label" style="color:#64748b !important;">{html.escape(rotulo_po)}</span>
+                <span class="valor" style="color:#1e3a5f !important;">{po}</span>
             </div>
             <div class="pedido-card">
-                <span class="label">Linha</span>
-                <span class="valor">{linha_num}</span>
+                <span class="label" style="color:#64748b !important;">Linha</span>
+                <span class="valor" style="color:#1e3a5f !important;">{linha_num}</span>
             </div>
             <div class="pedido-card pedido-card-wide">
-                <span class="label">Fornecedor</span>
-                <span class="valor">{fornecedor}</span>
+                <span class="label" style="color:#64748b !important;">Fornecedor</span>
+                <span class="valor" style="color:#1e3a5f !important;">{fornecedor}</span>
             </div>
         </div>
         """,

@@ -99,7 +99,8 @@ def render_tela_login() -> None:
         st.error("Código não encontrado. Verifique com a equipe Alcoa e tente novamente.")
 
     st.caption(
-        "Cada fornecedor enxerga somente pedidos e respostas vinculados ao seu código."
+        "O código é cadastrado pela equipe Alcoa no arquivo fornecedores_codigos.json. "
+        "Se não funcionar, confirme seu código com o comprador responsável."
     )
 
 

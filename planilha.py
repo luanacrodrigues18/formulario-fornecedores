@@ -33,7 +33,7 @@ ABA_FORM = "Form1"
 ABA_FORM_ALT = "Formulario_Respostas"
 LINHA_CABECALHO_BASE = 10
 LINHA_INICIO_DADOS = 11
-COL_CODIGO_FORNECEDOR = 10
+# Código do fornecedor vem de fornecedores_codigos.json (a planilha FUP não tem essa coluna).
 
 COLUNAS_FORM = [
     "ID",
@@ -175,9 +175,7 @@ def _linha_para_registro(indice: int, linha: tuple[Any, ...]) -> dict[str, Any]:
         "acordo": _normalizar_texto(linha[0] if len(linha) > 0 else ""),
         "release": _normalizar_texto(linha[1] if len(linha) > 1 else ""),
         "numero_linha": _normalizar_texto(linha[6] if len(linha) > 6 else ""),
-        "codigo_fornecedor": _normalizar_texto(
-            linha[COL_CODIGO_FORNECEDOR] if len(linha) > COL_CODIGO_FORNECEDOR else ""
-        ),
+        "codigo_fornecedor": "",
         "fornecedor": _normalizar_texto(linha[11] if len(linha) > 11 else ""),
         "email_fornecedor": _normalizar_texto(linha[26] if len(linha) > 26 else ""),
         "numero_po_com_release": _po_com_release(linha),

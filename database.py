@@ -200,7 +200,16 @@ def buscar_locais() -> list[dict[str, Any]]:
 
 def inserir_registro(dados: dict[str, Any]) -> dict[str, Any]:
     client = get_client()
-    response = client.table(supabase_table()).insert(dados).execute()
+    payload = dict(dados)
+    try:
+        response = client.table(supabase_table()).insert(payload).execute()
+    except Exception as exc:
+        mensagem = str(exc)
+        if "codigo_fornecedor" in mensagem and "codigo_fornecedor" in payload:
+            payload.pop("codigo_fornecedor", None)
+            response = client.table(supabase_table()).insert(payload).execute()
+        else:
+            raise
     if not response.data:
         raise RuntimeError("Não foi possível inserir o registro.")
     return response.data[0]
