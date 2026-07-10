@@ -347,11 +347,11 @@ ID (login) → fornecedores_codigos.json → Nome = coluna FORNECEDOR da FUP
 
 | Estratégia | Como funciona | Quando usar |
 |---|---|---|
-| **JSON local / Storage** (passo 1 atual) | Arquivo gerado por `gerar_codigos_fornecedores.py` | MVP e piloto |
+| **JSON local** (passo 1 atual) | Arquivo gerado por `gerar_codigos_fornecedores.py`; lido só da pasta do projeto | MVP local e piloto |
 | **Tabela Supabase `fornecedores`** | `id`, `nome`, `cnpj` opcional | Produção — IDs estáveis |
 | **Master data / SAP** | Código oficial do fornecedor | Longo prazo |
 
-**Recomendação:** curto prazo = JSON no Storage junto com a FUP; médio prazo = **tabela `fornecedores`** no Supabase; longo prazo = código SAP.
+**Recomendação:** curto prazo = JSON na pasta do app (local); médio prazo = **tabela `fornecedores`** no Supabase (login na nuvem); longo prazo = código SAP.
 
 Exemplo de evolução SQL:
 
@@ -574,7 +574,7 @@ API intermediária
 - [x] Login por ID do fornecedor (`auth_fornecedor.py`)
 - [x] Cadastro `fornecedores_codigos.json` gerado da FUP
 - [ ] Coluna `codigo_fornecedor` no Supabase (se ainda não rodou o SQL)
-- [ ] Upload do JSON de códigos no Storage (nuvem)
+- [ ] Login na nuvem (tabela `fornecedores` ou JSON no deploy)
 - [ ] Supabase Pro ou revisão de RLS
 - [ ] Índice único `PO + linha` no banco
 - [ ] Domínio amigável (mesmo no Streamlit)

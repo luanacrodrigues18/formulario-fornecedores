@@ -1,4 +1,4 @@
-# Guia de implantação — Formulário de Fornecedores
+# Guia de implantação - Formulário de Fornecedores
 
 Documentação passo a passo do que foi configurado neste projeto: **Supabase** (banco + arquivo FUP), **login por código do fornecedor** e **Streamlit Cloud** (formulário público e dashboard).
 
@@ -18,16 +18,18 @@ envia resposta → Supabase (tabela formulario + codigo_fornecedor)
 Equipe Alcoa  →  dashboard.py  →  lê Supabase
 ```
 
-| Componente | Arquivo | Função |
-|---|---|---|
-| Formulário + login | `app.py` | Login por ID, busca e envio |
-| Autenticação | `auth_fornecedor.py` | Sessão, tela de login, isolamento |
-| Cadastro de IDs | `fornecedores_codigos.json` | Mapa `ID → nome do fornecedor` |
-| Gerador de IDs | `gerar_codigos_fornecedores.py` | Cria JSON a partir da FUP |
-| Dashboard interno | `dashboard.py` | Visualiza, filtra e exporta |
-| Banco de dados | `database.py` | Supabase, validação e gravação |
-| Planilha FUP | `planilha.py` | Lê pedidos da aba Follow-up-Release |
-| Assistente | `alcoano.py` | ALUX — dicas e FAQ |
+
+| Componente         | Arquivo                         | Função                              |
+| ------------------ | ------------------------------- | ----------------------------------- |
+| Formulário + login | `app.py`                        | Login por ID, busca e envio         |
+| Autenticação       | `auth_fornecedor.py`            | Sessão, tela de login, isolamento   |
+| Cadastro de IDs    | `fornecedores_codigos.json`     | Mapa `ID → nome do fornecedor`      |
+| Gerador de IDs     | `gerar_codigos_fornecedores.py` | Cria JSON a partir da FUP           |
+| Dashboard interno  | `dashboard.py`                  | Visualiza, filtra e exporta         |
+| Banco de dados     | `database.py`                   | Supabase, validação e gravação      |
+| Planilha FUP       | `planilha.py`                   | Lê pedidos da aba Follow-up-Release |
+| Assistente         | `alcoano.py`                    | ALUX — dicas e FAQ                  |
+
 
 **URLs de produção (exemplo deste projeto):**
 
@@ -36,7 +38,11 @@ Equipe Alcoa  →  dashboard.py  →  lê Supabase
 
 ---
 
+
+
 ## Parte 1 — Configurar o Supabase
+
+
 
 ### 1.1 Criar o projeto
 
@@ -44,6 +50,8 @@ Equipe Alcoa  →  dashboard.py  →  lê Supabase
 2. Clique em **New project**.
 3. Escolha nome, senha do banco e região.
 4. Aguarde o projeto ficar **Active**.
+
+
 
 ### 1.2 Criar a tabela de respostas
 
@@ -81,56 +89,69 @@ ON formulario FOR INSERT
 WITH CHECK (true);
 ```
 
-4. Confirme em **Table Editor** que a tabela `formulario` foi criada **com** a coluna `codigo_fornecedor`.
+1. Confirme em **Table Editor** que a tabela `formulario` foi criada **com** a coluna `codigo_fornecedor`.
 
 > Sem essa coluna, o envio falha com erro `PGRST204` / schema cache.  
 > Em produção futura, revise as políticas RLS conforme a política de segurança da empresa.
 
+
+
 ### 1.3 Guardar o arquivo FUP no Storage (para a nuvem)
 
-O formulário precisa do arquivo **`relatorio_fup.xlsm`** para buscar pedidos. Na nuvem ele não vai no GitHub (é sensível/grande), então fica no **Supabase Storage**.
+O formulário precisa do arquivo `relatorio_fup.xlsm` para buscar pedidos. Na nuvem ele não vai no GitHub (é sensível/grande), então fica no **Supabase Storage**.
 
 1. No Supabase, abra **Storage**.
-2. Crie um bucket chamado **`Form`** (ou outro nome — se mudar, atualize o `.env`).
+2. Crie um bucket chamado `Form` (ou outro nome — se mudar, atualize o `.env`).
 3. Deixe o bucket **público** para leitura **ou** configure política de leitura para a chave `anon`.
-4. Faça upload do arquivo com o nome exato: **`relatorio_fup.xlsm`**
-   - Evite acentos e espaços no nome do arquivo.
-   - O nome antigo `Relatório - FUP.xlsm` causava erro no Storage.
+4. Faça upload do arquivo com o nome exato: `relatorio_fup.xlsm`
+  - Evite acentos e espaços no nome do arquivo.
+  - O nome antigo `Relatório - FUP.xlsm` causava erro no Storage.
+5. (Opcional) Guarde uma cópia de `fornecedores_codigos.json` no mesmo bucket `Form` como **backup interno**. O app **não** baixa esse arquivo do Storage — o login usa o JSON **na pasta do projeto** (veja seção 2.5 e limitação na nuvem em 4.3).
 
-5. (Recomendado) Faça também upload do **`fornecedores_codigos.json`** no mesmo bucket `Form`, para o login por ID funcionar na nuvem.
+
 
 ### 1.4 Copiar URL e chave da API
 
 1. Vá em **Project Settings** (ícone de engrenagem).
 2. Abra **API**.
 3. Copie na **mesma tela**:
-   - **Project URL** → vira `SUPABASE_URL`
-   - **anon public** (chave pública) → vira `SUPABASE_KEY`
+  - **Project URL** → vira `SUPABASE_URL`
+  - **anon public** (chave pública) → vira `SUPABASE_KEY`
 
 **Atenção — erros comuns:**
 
-| Problema | Causa |
-|---|---|
+
+| Problema                                           | Causa                                                          |
+| -------------------------------------------------- | -------------------------------------------------------------- |
 | `getaddrinfo failed` / `Name or service not known` | URL do Supabase digitada errada (ex.: `taaq` em vez de `taeq`) |
-| Dados não salvam / erro de autenticação | URL de um projeto e chave `anon` de outro |
-| Formulário na nuvem sem FUP | Arquivo não está no Storage ou nome diferente |
+| Dados não salvam / erro de autenticação            | URL de um projeto e chave `anon` de outro                      |
+| Formulário na nuvem sem FUP                        | Arquivo não está no Storage ou nome diferente                  |
+
 
 A URL deve ser algo como: `https://xxxxxxxx.supabase.co` (copiada exatamente do painel).
 
 ---
 
+
+
 ## Parte 2 — Rodar localmente (teste antes do deploy)
+
+
 
 ### 2.1 Pré-requisitos
 
 - Python 3.11 ou superior
 - Git instalado
 
+
+
 ### 2.2 Clonar / abrir o projeto
 
 ```powershell
 cd "C:\caminho\para\Project Form"
 ```
+
+
 
 ### 2.3 Ambiente virtual e dependências
 
@@ -140,6 +161,8 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
+
+
 ### 2.4 Arquivo `.env` (uso local)
 
 1. Copie o exemplo:
@@ -148,7 +171,7 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-2. Edite o `.env` com seus dados:
+1. Edite o `.env` com seus dados:
 
 ```env
 SUPABASE_URL=https://SEU-PROJETO.supabase.co
@@ -161,9 +184,11 @@ FORM_BASE_URL=http://localhost:8501
 
 > O arquivo `.env` **nunca** deve ir para o GitHub (já está no `.gitignore`).
 
+
+
 ### 2.5 Arquivo FUP e códigos de fornecedor (local)
 
-1. Coloque **`relatorio_fup.xlsm`** na pasta raiz do projeto.
+1. Coloque `relatorio_fup.xlsm` na pasta raiz do projeto.
 2. Gere o cadastro de IDs:
 
 ```powershell
@@ -174,7 +199,10 @@ Isso cria `fornecedores_codigos.json` (mapa ID → nome) e `fornecedores_codigos
 
 - **Com FUP local:** o app usa o arquivo da pasta (útil se a rede bloquear Supabase).
 - **Sem FUP local:** o app tenta baixar do Supabase Storage.
-- **Sem `fornecedores_codigos.json`:** o login por código não encontra nenhum fornecedor.
+- **Login por ID:** exige `fornecedores_codigos.json` **na pasta do projeto** (gerado com `gerar_codigos_fornecedores.py`).
+- **Sem JSON local:** o login por código não encontra nenhum fornecedor (upload no Storage **não** substitui o arquivo local hoje).
+
+
 
 ### 2.6 Executar e testar
 
@@ -197,6 +225,8 @@ Abra: `http://localhost:8501`
 streamlit run dashboard.py
 ```
 
+
+
 ### 2.7 Checklist do teste local
 
 - [ ] Login com ID válido entra e mostra o nome do fornecedor
@@ -210,15 +240,19 @@ streamlit run dashboard.py
 
 ---
 
+
+
 ## Parte 2.8 — Cadastro de IDs (passo 1)
 
-A FUP **não tem coluna de código**. O isolamneto funciona assim:
+A FUP **não tem coluna de código**. O isolamento funciona assim:
 
-| Item | Onde fica |
-|---|---|
-| Pedidos (PO, linha, item) | `relatorio_fup.xlsm` |
-| ID de login | `fornecedores_codigos.json` |
-| Respostas enviadas | tabela `formulario` no Supabase |
+
+| Item                      | Onde fica                       |
+| ------------------------- | ------------------------------- |
+| Pedidos (PO, linha, item) | `relatorio_fup.xlsm`            |
+| ID de login               | `fornecedores_codigos.json`     |
+| Respostas enviadas        | tabela `formulario` no Supabase |
+
 
 Quando a FUP for atualizada, rode de novo:
 
@@ -228,11 +262,15 @@ python gerar_codigos_fornecedores.py
 
 **Atenção:** regenerar o JSON por ordem alfabética pode **mudar os IDs**. Em produção, prefira IDs estáveis (código SAP) e edite o JSON manualmente.
 
-Na nuvem, coloque o JSON no **Supabase Storage** (bucket `Form`) ou migre depois para uma tabela `fornecedores`.
+Na nuvem (Streamlit Cloud), o JSON **não vai no Git** (`.gitignore`). Para o login funcionar em produção, planeje: tabela `fornecedores` no Supabase, ou disponibilizar o JSON no deploy de forma controlada (repositório privado / pipeline interno).
 
 ---
 
+
+
 ## Parte 3 — Publicar no GitHub
+
+
 
 ### 3.1 O que vai (e o que NÃO vai) para o Git
 
@@ -251,6 +289,8 @@ Na nuvem, coloque o JSON no **Supabase Storage** (bucket `Form`) ou migre depois
 - `fornecedores_codigos.json` e `fornecedores_codigos_lista.txt` (cadastro interno)
 - `formulario_respostas.xlsx` (fallback local)
 
+
+
 ### 3.2 Enviar código
 
 ```powershell
@@ -264,7 +304,11 @@ git push -u origin login-fornecedor
 
 ---
 
+
+
 ## Parte 4 — Deploy no Streamlit Cloud
+
+
 
 ### 4.1 Criar conta e conectar GitHub
 
@@ -272,14 +316,18 @@ git push -u origin login-fornecedor
 2. Entre com a conta **GitHub**.
 3. Autorize o Streamlit a acessar seus repositórios.
 
+
+
 ### 4.2 Deploy do formulário (`app.py`)
 
 1. Clique em **Create app**.
 2. Preencha:
-   - **Repository:** `luanacrodrigues18/formulario-fornecedores` (ou o seu)
-   - **Branch:** `main` (ou `login-fornecedor` se ainda estiver em PR)
-   - **Main file path:** `app.py`
+  - **Repository:** `luanacrodrigues18/formulario-fornecedores` (ou o seu)
+  - **Branch:** `main` (ou `login-fornecedor` se ainda estiver em PR)
+  - **Main file path:** `app.py`
 3. Clique em **Deploy**.
+
+
 
 ### 4.3 Configurar Secrets no Streamlit (obrigatório)
 
@@ -295,11 +343,15 @@ SUPABASE_FUP_FILE = "relatorio_fup.xlsm"
 FORM_BASE_URL = "https://formulario-fornecedores.streamlit.app"
 ```
 
-3. Salve e clique em **Reboot app**.
-4. Confirme no Storage o upload de `relatorio_fup.xlsm` **e** `fornecedores_codigos.json`.
-5. Confirme no SQL Editor que existe a coluna `codigo_fornecedor`.
+1. Salve e clique em **Reboot app**.
+2. Confirme no Storage o upload de `relatorio_fup.xlsm`.
+3. Confirme no SQL Editor que existe a coluna `codigo_fornecedor`.
+
+> **Login na nuvem:** o app lê `fornecedores_codigos.json` só da pasta do projeto. Como o arquivo não vai no Git, o **login por ID não funciona no Streamlit Cloud** com o código atual — use o formulário local para testar login, ou evolua para tabela `fornecedores` no Supabase.
 
 > Local usa `.env`. Na nuvem usa **Secrets** — são a mesma configuração, em lugares diferentes.
+
+
 
 ### 4.4 Deploy do dashboard (`dashboard.py`)
 
@@ -310,6 +362,8 @@ O dashboard é um **segundo app** no Streamlit Cloud:
 3. **Main file path:** `dashboard.py`
 4. Use os **mesmos Secrets** do formulário.
 5. Deploy e **Reboot**.
+
+
 
 ### 4.5 Atualizar depois de mudanças no código
 
@@ -323,7 +377,11 @@ No Streamlit Cloud: **⋮** → **Reboot app** (ou aguarde o redeploy automátic
 
 ---
 
+
+
 ## Parte 5 — Verificação em produção
+
+
 
 ### Formulário (`app.py`)
 
@@ -333,6 +391,8 @@ No Streamlit Cloud: **⋮** → **Reboot app** (ou aguarde o redeploy automátic
 4. Preencha e envie.
 5. Confirme no Supabase (**Table Editor** → `formulario`) que o registro apareceu com `codigo_fornecedor`.
 
+
+
 ### Dashboard (`dashboard.py`)
 
 1. Abra a URL do dashboard.
@@ -341,13 +401,17 @@ No Streamlit Cloud: **⋮** → **Reboot app** (ou aguarde o redeploy automátic
 
 ---
 
+
+
 ## Problemas frequentes e soluções
+
+
 
 ### Código não encontrado no login
 
-**Causa:** `fornecedores_codigos.json` ausente ou nome do fornecedor diferente do FUP.
+**Causa:** `fornecedores_codigos.json` ausente na pasta do projeto, ou nome do fornecedor diferente do FUP.
 
-**Solução:** rode `python gerar_codigos_fornecedores.py` e use um ID da lista gerada.
+**Solução:** rode `python gerar_codigos_fornecedores.py` e use um ID da lista gerada. Na nuvem, o login só funcionará quando o JSON estiver disponível no ambiente de deploy (hoje não é baixado do Storage).
 
 ### Erro `Could not find the 'codigo_fornecedor' column` (PGRST204)
 
@@ -358,6 +422,8 @@ No Streamlit Cloud: **⋮** → **Reboot app** (ou aguarde o redeploy automátic
 ```sql
 ALTER TABLE formulario ADD COLUMN IF NOT EXISTS codigo_fornecedor TEXT;
 ```
+
+
 
 ### Rede da empresa bloqueia Supabase no PC local
 
@@ -385,6 +451,8 @@ ALTER TABLE formulario ADD COLUMN IF NOT EXISTS codigo_fornecedor TEXT;
 
 ---
 
+
+
 ## Estrutura final do projeto
 
 ```
@@ -407,6 +475,8 @@ Project Form/
 ```
 
 ---
+
+
 
 ## Resumo rápido (cola)
 

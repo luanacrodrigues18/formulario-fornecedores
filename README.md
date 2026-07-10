@@ -7,6 +7,7 @@ Sistema em Python com **Streamlit** e **Supabase** para coleta de dados de forne
 - **Login por código do fornecedor** — cada fornecedor vê só os próprios pedidos
 - Formulário em 3 passos (buscar → escolher linha → enviar)
 - Assistente **ALUX** (dicas e FAQ na sidebar)
+- Sidebar com fornecedor logado, **Minhas respostas** e botão **Sair**
 - Dashboard interno para filtrar e exportar registros
 - Respostas salvas no Supabase (com fallback local)
 - Geração de IDs sequenciais a partir da planilha FUP
@@ -129,7 +130,12 @@ O **nome** precisa ser **igual** ao da coluna `FORNECEDOR` na FUP.
 
 ### 4. Na nuvem (Streamlit Cloud)
 
-Coloque `fornecedores_codigos.json` no **Supabase Storage** (mesmo bucket da FUP) ou mantenha um processo interno para disponibilizar o arquivo. Em etapas futuras, o ideal é uma tabela `fornecedores` no Supabase.
+> **Importante:** hoje o app lê `fornecedores_codigos.json` **somente da pasta do projeto** (não baixa do Storage como a FUP). O arquivo está no `.gitignore`, então **o login por ID não funciona na nuvem** até você adotar uma destas opções:
+>
+> - Incluir o JSON no deploy de forma controlada (ex.: arquivo versionado só no repositório privado, fora do `.gitignore` em ambiente interno), ou
+> - Evoluir para tabela `fornecedores` no Supabase (recomendado em produção).
+
+Guarde uma cópia do JSON no **Supabase Storage** (bucket `Form`) como backup interno da equipe, se quiser — mas isso ainda **não** alimenta o login automaticamente.
 
 ## Como executar
 
@@ -139,6 +145,12 @@ Coloque `fornecedores_codigos.json` no **Supabase Storage** (mesmo bucket da FUP
 ### Formulário
 
 ```bash
+# Windows (com venv):
+venv\Scripts\activate
+streamlit run app.py
+
+# Linux/macOS:
+source venv/bin/activate
 streamlit run app.py
 ```
 
@@ -192,6 +204,7 @@ projeto/
 ├── gerar_template.py
 ├── fornecedores_codigos.json       # Cadastro ID → nome (local, não vai ao Git)
 ├── relatorio_fup.xlsm              # Base de pedidos (local / Storage)
+├── .streamlit/config.toml          # Tema claro por padrão
 ├── GUIA_IMPLANTACAO.md
 ├── DEPLOY_PRODUCAO.md
 ├── .env.example
