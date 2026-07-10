@@ -54,6 +54,10 @@ def supabase_storage_bucket() -> str:
 def supabase_fup_file() -> str:
     return _ler_config("SUPABASE_FUP_FILE", "relatorio_fup.xlsm")
 
+
+def supabase_codigos_file() -> str:
+    return _ler_config("SUPABASE_CODIGOS_FILE", "fornecedores_codigos.json")
+
 COLUNAS_EXIBICAO = {
     "id": "ID",
     "hora_inicio": "Hora de início",
@@ -114,7 +118,7 @@ def get_client() -> Client:
     return _client
 
 
-def baixar_fup_storage(destino: Path) -> None:
+def baixar_arquivo_storage(arquivo: str, destino: Path) -> None:
     url = supabase_url()
     if not url.startswith("https://") or "supabase.co" not in url:
         raise ValueError(
@@ -123,7 +127,6 @@ def baixar_fup_storage(destino: Path) -> None:
         )
     client = get_client()
     bucket = supabase_storage_bucket()
-    arquivo = supabase_fup_file()
     try:
         dados = client.storage.from_(bucket).download(arquivo)
     except Exception as exc:
@@ -135,6 +138,10 @@ def baixar_fup_storage(destino: Path) -> None:
             ) from exc
         raise
     destino.write_bytes(dados)
+
+
+def baixar_fup_storage(destino: Path) -> None:
+    baixar_arquivo_storage(supabase_fup_file(), destino)
 
 
 def criar_tabela() -> bool:

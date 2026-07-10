@@ -27,6 +27,7 @@ from planilha import (
     ARQUIVO_FUP,
     buscar_por_po_e_linha,
     data_promessa_inicial,
+    garantir_arquivo_codigos,
     garantir_arquivo_fup,
     listar_fornecedores,
     rotulo_linha,
@@ -670,6 +671,26 @@ try:
     listar_fornecedores()
 except Exception as exc:
     st.error(f"Erro ao ler a aba Follow-up-Release: {exc}")
+    st.stop()
+
+_codigos_local = _pasta_app / "fornecedores_codigos.json"
+if not _codigos_local.is_file():
+    try:
+        garantir_arquivo_codigos()
+    except Exception as exc:
+        st.error(
+            "Cadastro de códigos de fornecedor não encontrado. "
+            f"Faça upload de **fornecedores_codigos.json** no bucket do Supabase Storage. "
+            f"Detalhe: {exc}"
+        )
+        st.stop()
+
+if not planilha_mod.ARQUIVO_CODIGOS.is_file():
+    st.error(
+        "Arquivo **fornecedores_codigos.json** não encontrado. "
+        "Gere com `python gerar_codigos_fornecedores.py` e coloque na pasta do projeto "
+        "ou faça upload no Supabase Storage."
+    )
     st.stop()
 
 if not autenticado():

@@ -26,6 +26,7 @@ def _load_workbook(caminho: Path | str, **kwargs):
 
 BASE_DIR = Path(__file__).resolve().parent
 ARQUIVO_FUP = BASE_DIR / "relatorio_fup.xlsm"
+ARQUIVO_CODIGOS = BASE_DIR / "fornecedores_codigos.json"
 ARQUIVO_RESPOSTAS = BASE_DIR / "formulario_respostas.xlsx"
 
 ABA_BASE = "Follow-up-Release"
@@ -94,13 +95,49 @@ def mesmo_codigo_fornecedor(codigo_a: str, codigo_b: str) -> bool:
     return bool(codigos_equivalentes(codigo_a) & codigos_equivalentes(codigo_b))
 
 
+def garantir_arquivo_codigos() -> None:
+    if ARQUIVO_CODIGOS.is_file():
+        return
+
+    from database import (
+        baixar_arquivo_storage,
+        supabase_codigos_file,
+        supabase_configurado,
+        supabase_storage_bucket,
+    )
+
+    if not supabase_configurado():
+        return
+
+    try:
+        baixar_arquivo_storage(supabase_codigos_file(), ARQUIVO_CODIGOS)
+    except Exception as exc:
+        mensagem = str(exc)
+        if "11001" in mensagem or "getaddrinfo" in mensagem.lower():
+            raise RuntimeError(
+                "Não foi possível conectar ao Supabase para baixar o cadastro de códigos. "
+                "Coloque fornecedores_codigos.json na pasta do projeto."
+            ) from exc
+        raise RuntimeError(
+            f"Não foi possível baixar {supabase_codigos_file()} "
+            f"do bucket {supabase_storage_bucket()}. "
+            "Faça upload do arquivo no Supabase Storage."
+        ) from exc
+
+    if not ARQUIVO_CODIGOS.exists():
+        raise RuntimeError(
+            f"Não foi possível baixar {supabase_codigos_file()} "
+            f"do bucket {supabase_storage_bucket()}."
+        )
+    carregar_mapa_codigos_manual.cache_clear()
+
+
 @lru_cache(maxsize=1)
 def carregar_mapa_codigos_manual() -> dict[str, str]:
-    caminho = BASE_DIR / "fornecedores_codigos.json"
-    if not caminho.is_file():
+    if not ARQUIVO_CODIGOS.is_file():
         return {}
 
-    with caminho.open(encoding="utf-8") as arquivo:
+    with ARQUIVO_CODIGOS.open(encoding="utf-8") as arquivo:
         dados = json.load(arquivo)
 
     mapa: dict[str, str] = {}
