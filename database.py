@@ -60,6 +60,7 @@ COLUNAS_EXIBICAO = {
     "hora_conclusao": "Hora da conclusão",
     "email": "Email",
     "nome": "Nome",
+    "codigo_fornecedor": "Código do fornecedor",
     "numero_po_com_release": "Número do PO com Release",
     "data_promessa": "Data da Promessa",
     "observacoes_coleta": "Observações de Coleta",
@@ -80,6 +81,7 @@ CAMPOS_TABELA = [
     "hora_conclusao",
     "email",
     "nome",
+    "codigo_fornecedor",
     "numero_po_com_release",
     "data_promessa",
     "observacoes_coleta",
@@ -173,7 +175,8 @@ def inserir_registro_local(dados: dict[str, Any]) -> dict[str, Any]:
 
 
 def _dados_para_supabase(dados: dict[str, Any]) -> dict[str, Any]:
-    return {campo: dados[campo] for campo in CAMPOS_TABELA if campo in dados}
+    payload = {campo: dados[campo] for campo in CAMPOS_TABELA if campo in dados}
+    return {k: v for k, v in payload.items() if v is not None and str(v).strip() != ""}
 
 
 def _chave_po_linha(numero_po: str, numero_linha: str) -> tuple[str, str]:
@@ -197,7 +200,16 @@ def buscar_locais() -> list[dict[str, Any]]:
 
 def inserir_registro(dados: dict[str, Any]) -> dict[str, Any]:
     client = get_client()
-    response = client.table(supabase_table()).insert(dados).execute()
+    payload = dict(dados)
+    try:
+        response = client.table(supabase_table()).insert(payload).execute()
+    except Exception as exc:
+        mensagem = str(exc)
+        if "codigo_fornecedor" in mensagem and "codigo_fornecedor" in payload:
+            payload.pop("codigo_fornecedor", None)
+            response = client.table(supabase_table()).insert(payload).execute()
+        else:
+            raise
     if not response.data:
         raise RuntimeError("Não foi possível inserir o registro.")
     return response.data[0]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import warnings
 from datetime import date, datetime
 from urllib.parse import quote
@@ -32,6 +33,7 @@ ABA_FORM = "Form1"
 ABA_FORM_ALT = "Formulario_Respostas"
 LINHA_CABECALHO_BASE = 10
 LINHA_INICIO_DADOS = 11
+# Código do fornecedor vem de fornecedores_codigos.json (a planilha FUP não tem essa coluna).
 
 COLUNAS_FORM = [
     "ID",
@@ -67,12 +69,113 @@ def _po_com_release(linha: tuple[Any, ...]) -> str:
     return acordo
 
 
+def _normalizar_codigo_fornecedor(valor: Any) -> str:
+    texto = _normalizar_texto(valor)
+    if not texto:
+        return ""
+    if texto.replace(".", "").isdigit():
+        return texto.lstrip("0") or "0"
+    return texto
+
+
+def codigos_equivalentes(codigo: str) -> set[str]:
+    base = _normalizar_codigo_fornecedor(codigo)
+    bruto = _normalizar_texto(codigo)
+    if not base and not bruto:
+        return set()
+
+    variantes = {base, bruto}
+    if base.isdigit():
+        variantes.add(base.zfill(10))
+    return {v for v in variantes if v}
+
+
+def mesmo_codigo_fornecedor(codigo_a: str, codigo_b: str) -> bool:
+    return bool(codigos_equivalentes(codigo_a) & codigos_equivalentes(codigo_b))
+
+
+@lru_cache(maxsize=1)
+def carregar_mapa_codigos_manual() -> dict[str, str]:
+    caminho = BASE_DIR / "fornecedores_codigos.json"
+    if not caminho.is_file():
+        return {}
+
+    with caminho.open(encoding="utf-8") as arquivo:
+        dados = json.load(arquivo)
+
+    mapa: dict[str, str] = {}
+    if isinstance(dados, dict):
+        for codigo, nome in dados.items():
+            codigo_norm = _normalizar_codigo_fornecedor(str(codigo))
+            nome_norm = _normalizar_texto(nome)
+            if codigo_norm and nome_norm:
+                mapa[codigo_norm] = nome_norm
+    return mapa
+
+
+def resolver_fornecedor_por_codigo(codigo: str) -> dict[str, str] | None:
+    codigo = _normalizar_texto(codigo)
+    if not codigo:
+        return None
+
+    for chave, nome in carregar_mapa_codigos_manual().items():
+        if mesmo_codigo_fornecedor(chave, codigo):
+            return {
+                "codigo_fornecedor": _normalizar_codigo_fornecedor(chave),
+                "fornecedor": nome,
+            }
+
+    for registro in carregar_base_fup():
+        codigo_registro = registro.get("codigo_fornecedor", "")
+        if codigo_registro and mesmo_codigo_fornecedor(codigo_registro, codigo):
+            return {
+                "codigo_fornecedor": _normalizar_codigo_fornecedor(codigo_registro),
+                "fornecedor": registro["fornecedor"],
+            }
+
+    return None
+
+
+def buscar_linhas_do_codigo(codigo: str) -> list[dict[str, Any]]:
+    info = resolver_fornecedor_por_codigo(codigo)
+    if not info:
+        return []
+
+    nome = info["fornecedor"]
+    codigo_norm = info["codigo_fornecedor"]
+    linhas = [r for r in carregar_base_fup() if r.get("fornecedor") == nome]
+    com_codigo = [
+        r
+        for r in linhas
+        if r.get("codigo_fornecedor")
+        and mesmo_codigo_fornecedor(r["codigo_fornecedor"], codigo_norm)
+    ]
+    return com_codigo if com_codigo else linhas
+
+
+def buscar_respostas_do_codigo(codigo: str, nome_fornecedor: str = "") -> list[dict[str, Any]]:
+    from database import buscar_todos
+
+    respostas: list[dict[str, Any]] = []
+    for registro in buscar_todos():
+        codigo_registro = registro.get("codigo_fornecedor", "")
+        if codigo_registro and mesmo_codigo_fornecedor(codigo_registro, codigo):
+            respostas.append(registro)
+            continue
+        if nome_fornecedor and _normalizar_texto(registro.get("nome", "")) == _normalizar_texto(
+            nome_fornecedor
+        ):
+            respostas.append(registro)
+    return respostas
+
+
 def _linha_para_registro(indice: int, linha: tuple[Any, ...]) -> dict[str, Any]:
     return {
         "indice_base": indice,
         "acordo": _normalizar_texto(linha[0] if len(linha) > 0 else ""),
         "release": _normalizar_texto(linha[1] if len(linha) > 1 else ""),
         "numero_linha": _normalizar_texto(linha[6] if len(linha) > 6 else ""),
+        "codigo_fornecedor": "",
         "fornecedor": _normalizar_texto(linha[11] if len(linha) > 11 else ""),
         "email_fornecedor": _normalizar_texto(linha[26] if len(linha) > 26 else ""),
         "numero_po_com_release": _po_com_release(linha),
@@ -129,6 +232,7 @@ def garantir_arquivo_fup() -> None:
             f"Não foi possível baixar {supabase_fup_file()} do bucket {supabase_storage_bucket()}."
         )
     carregar_base_fup.cache_clear()
+    carregar_mapa_codigos_manual.cache_clear()
 
 
 @lru_cache(maxsize=1)

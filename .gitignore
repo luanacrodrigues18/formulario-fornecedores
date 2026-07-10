@@ -5,3 +5,5 @@ __pycache__/
 formulario_respostas.xlsx
 dados_locais.json
 relatorio_fup.xlsm
+fornecedores_codigos.json
+fornecedores_codigos_lista.txt

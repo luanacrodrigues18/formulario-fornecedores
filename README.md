@@ -1,59 +1,55 @@
 # Formulário de Fornecedores
 
-Sistema em Python com **Streamlit** e **Supabase** para coleta de dados de fornecedores, visualização em dashboard local e exportação para Excel.
+Sistema em Python com **Streamlit** e **Supabase** para coleta de dados de fornecedores, com **login por código (ID)**, visualização em dashboard e exportação para Excel.
 
 ## Funcionalidades
 
-- Formulário público para fornecedores preencherem dados
-- Dashboard local para visualizar e filtrar registros
-- Exportação dos dados para Excel (.xlsx)
-- Geração de template Excel com os mesmos campos do formulário
+- **Login por código do fornecedor** — cada fornecedor vê só os próprios pedidos
+- Formulário em 3 passos (buscar → escolher linha → enviar)
+- Assistente **ALUX** (dicas e FAQ na sidebar)
+- Sidebar com fornecedor logado, **Minhas respostas** e botão **Sair**
+- Dashboard interno para filtrar e exportar registros
+- Respostas salvas no Supabase (com fallback local)
+- Geração de IDs sequenciais a partir da planilha FUP
 
 ## Requisitos
 
 - Python 3.11+
 - Conta no [Supabase](https://supabase.com)
+- Arquivo base `relatorio_fup.xlsm` (local ou Storage)
 
 ## Instalação
 
 ```bash
-# Clone ou acesse a pasta do projeto
 cd projeto
-
-# Crie um ambiente virtual (recomendado)
 python -m venv venv
 
-# Ative o ambiente virtual
 # Windows:
 venv\Scripts\activate
 # Linux/macOS:
 source venv/bin/activate
 
-# Instale as dependências
 pip install -r requirements.txt
 ```
 
 ## Configuração do .env
 
-1. Copie o arquivo de exemplo:
-
 ```bash
 copy .env.example .env
 ```
 
-2. Edite o arquivo `.env` com suas credenciais do Supabase:
-
 ```env
 SUPABASE_URL=https://seu-projeto.supabase.co
-SUPABASE_KEY=sua-chave-anon-ou-service-role
+SUPABASE_KEY=sua-chave-anon-publica
 SUPABASE_TABLE=formulario
+SUPABASE_STORAGE_BUCKET=Form
+SUPABASE_FUP_FILE=relatorio_fup.xlsm
+FORM_BASE_URL=http://localhost:8501
 ```
 
-As credenciais estão em **Project Settings → API** no painel do Supabase.
+Credenciais em **Project Settings → API** no Supabase.
 
-## Criar a tabela no Supabase
-
-No painel do Supabase, acesse **SQL Editor** e execute:
+## Criar / atualizar a tabela no Supabase
 
 ```sql
 CREATE TABLE IF NOT EXISTS formulario (
@@ -62,6 +58,7 @@ CREATE TABLE IF NOT EXISTS formulario (
     hora_conclusao TIMESTAMPTZ,
     email TEXT NOT NULL,
     nome TEXT NOT NULL,
+    codigo_fornecedor TEXT,
     numero_po_com_release TEXT NOT NULL,
     data_promessa DATE NOT NULL,
     observacoes_coleta TEXT,
@@ -69,6 +66,9 @@ CREATE TABLE IF NOT EXISTS formulario (
     numero_linha TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Se a tabela já existir sem a coluna:
+ALTER TABLE formulario ADD COLUMN IF NOT EXISTS codigo_fornecedor TEXT;
 
 ALTER TABLE formulario ENABLE ROW LEVEL SECURITY;
 
@@ -81,22 +81,91 @@ ON formulario FOR INSERT
 WITH CHECK (true);
 ```
 
-> Ajuste as políticas RLS conforme a segurança desejada em produção.
+## Login por código do fornecedor
+
+A planilha FUP tem o **nome** do fornecedor, mas **não tem ID**. O projeto usa um cadastro separado:
+
+```
+ID (login)  →  fornecedores_codigos.json  →  Nome do fornecedor
+                                                   ↓
+                                           Pedidos filtrados na FUP
+```
+
+### 1. Gerar os códigos (local)
+
+Com `relatorio_fup.xlsm` na pasta do projeto:
+
+```bash
+python gerar_codigos_fornecedores.py
+```
+
+Isso cria:
+
+| Arquivo | Conteúdo |
+|---|---|
+| `fornecedores_codigos.json` | Mapa `ID → nome` (ex.: `"6": "ACOS VITAL..."`) |
+| `fornecedores_codigos_lista.txt` | Lista para envio / conferência |
+
+Esses arquivos **não vão para o Git** (dados internos).
+
+### 2. Fluxo do fornecedor
+
+1. Recebe o **ID** por e-mail (ex.: `6`)
+2. Entra no formulário com o ID
+3. Vê só os pedidos da empresa dele
+4. Busca por PO/Release **ou** clica em “Ver todos os meus pedidos”
+5. Escolhe a linha, preenche e envia
+6. A resposta grava `codigo_fornecedor` no Supabase
+
+### 3. Exemplo do JSON
+
+```json
+{
+  "1": "A C NETO COMERCIO E REPRESENTACAO TECNICA EIRELI",
+  "6": "ACOS VITAL COMERCIO DE TUBOS HIDRAULICOS EIRELI"
+}
+```
+
+O **nome** precisa ser **igual** ao da coluna `FORNECEDOR` na FUP.
+
+### 4. Na nuvem (Streamlit Cloud)
+
+> **Importante:** hoje o app lê `fornecedores_codigos.json` **somente da pasta do projeto** (não baixa do Storage como a FUP). O arquivo está no `.gitignore`, então **o login por ID não funciona na nuvem** até você adotar uma destas opções:
+>
+> - Incluir o JSON no deploy de forma controlada (ex.: arquivo versionado só no repositório privado, fora do `.gitignore` em ambiente interno), ou
+> - Evoluir para tabela `fornecedores` no Supabase (recomendado em produção).
+
+Guarde uma cópia do JSON no **Supabase Storage** (bucket `Form`) como backup interno da equipe, se quiser — mas isso ainda **não** alimenta o login automaticamente.
 
 ## Como executar
 
-### Formulário público
+> **Deploy (Supabase + Streamlit):** [GUIA_IMPLANTACAO.md](GUIA_IMPLANTACAO.md)  
+> **Produção real (Azure, AWS, Docker…):** [DEPLOY_PRODUCAO.md](DEPLOY_PRODUCAO.md)
+
+### Formulário
 
 ```bash
+# Windows (com venv):
+venv\Scripts\activate
+streamlit run app.py
+
+# Linux/macOS:
+source venv/bin/activate
 streamlit run app.py
 ```
 
-Acesse `http://localhost:8501` no navegador.
+`http://localhost:8501`
 
 ### Dashboard
 
 ```bash
 streamlit run dashboard.py
+```
+
+### Gerar IDs dos fornecedores
+
+```bash
+python gerar_codigos_fornecedores.py
 ```
 
 ### Gerar template Excel
@@ -105,32 +174,39 @@ streamlit run dashboard.py
 python gerar_template.py
 ```
 
-O arquivo `template_fornecedores.xlsx` será criado na raiz do projeto.
+## Campos do formulário / banco
 
-## Campos do formulário
-
-| Campo na planilha              | Nome técnico no banco   |
-|--------------------------------|-------------------------|
-| ID                             | id                      |
-| Hora de início                 | hora_inicio             |
-| Hora da conclusão              | hora_conclusao          |
-| Email                          | email                   |
-| Nome                           | nome                    |
-| Número do PO com Release       | numero_po_com_release   |
-| Data da Promessa               | data_promessa           |
-| Observações de Coleta          | observacoes_coleta      |
-| Número da NF                   | numero_nf               |
-| Informe o número da linha      | numero_linha            |
+| Campo                         | Nome técnico           |
+|-------------------------------|------------------------|
+| ID                            | id                     |
+| Hora de início                | hora_inicio            |
+| Hora da conclusão             | hora_conclusao         |
+| Email                         | email                  |
+| Nome                          | nome                   |
+| Código do fornecedor          | codigo_fornecedor      |
+| Número do PO com Release      | numero_po_com_release  |
+| Data da Promessa              | data_promessa          |
+| Observações de Coleta         | observacoes_coleta     |
+| Número da NF                  | numero_nf              |
+| Número da linha               | numero_linha           |
 
 ## Estrutura do projeto
 
 ```
 projeto/
-├── app.py
-├── dashboard.py
+├── app.py                          # Formulário + login
+├── auth_fornecedor.py              # Sessão e tela de login
+├── dashboard.py                    # Dashboard interno
+├── database.py                     # Supabase + validações
+├── planilha.py                     # Leitura do FUP
+├── alcoano.py                      # ALUX (dicas / FAQ)
+├── gerar_codigos_fornecedores.py   # Gera IDs a partir da FUP
 ├── gerar_template.py
-├── database.py
-├── .env
+├── fornecedores_codigos.json       # Cadastro ID → nome (local, não vai ao Git)
+├── relatorio_fup.xlsm              # Base de pedidos (local / Storage)
+├── .streamlit/config.toml          # Tema claro por padrão
+├── GUIA_IMPLANTACAO.md
+├── DEPLOY_PRODUCAO.md
 ├── .env.example
 ├── requirements.txt
 └── README.md
@@ -138,6 +214,8 @@ projeto/
 
 ## Observações
 
-- `hora_inicio` e `hora_conclusao` são preenchidos automaticamente pelo sistema.
-- Campos obrigatórios: Email, Nome, Número do PO com Release, Data da Promessa e Número da linha.
-- O dashboard exporta os registros filtrados para Excel.
+- `hora_inicio` e `hora_conclusao` são preenchidos automaticamente.
+- Campos obrigatórios: Email, Nome, PO com Release, Data da Promessa e Número da linha.
+- Um envio por **PO + linha** (bloqueia duplicata).
+- Login por **ID interno**; CNPJ pode ser adicionado depois como dado cadastral.
+- Regenerar códigos após atualizar a FUP: `python gerar_codigos_fornecedores.py`.
