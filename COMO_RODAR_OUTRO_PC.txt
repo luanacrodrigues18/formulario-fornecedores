@@ -1,0 +1,160 @@
+================================================================================
+  FORMULÁRIO DE FORNECEDORES — COMO RODAR EM OUTRO PC (Windows Alcoa)
+================================================================================
+
+Caminho de rede (já configurado no projeto — caminhos_rede_alcoa.bat):
+  \\noa.alcoa.com\dfs\PGH\InfoShare1\GSS_PMO\AA_Static\116_PSC_PO_Followup\Alumar-operação\Vitoria
+
+Unidade mapeada padrão:  V:
+Pasta do projeto na rede:  V:\FormularioFornecedores
+Pasta local recomendada:  C:\Projetos\FormularioFornecedores
+
+Scripts prontos:
+  mapear_rede_alcoa.bat       → mapeia V: para a pasta Alcoa
+  copiar_rede_para_local.bat  → copia V:\FormularioFornecedores → C:\Projetos\...
+  setup_outro_pc.bat          → cria venv e instala Python packages
+  rodar_formulario.bat
+  rodar_dashboard.bat
+
+IMPORTANTE
+----------
+1) Não rode o Streamlit DIRETO pela pasta UNC (\\noa.alcoa.com\...).
+   Python e venv costumam falhar ou ficar lentos em caminho de rede.
+
+2) Fluxo recomendado no outro PC:
+   A) Duplo clique em mapear_rede_alcoa.bat
+   B) Duplo clique em copiar_rede_para_local.bat
+   C) Em C:\Projetos\FormularioFornecedores rode setup_outro_pc.bat
+   D) Depois rodar_formulario.bat
+
+3) Python PRECISA existir no PC (instalado pela TI ou portátil — ver abaixo).
+
+
+--------------------------------------------------------------------------------
+PASSO 1 — O que colocar na pasta compartilhada (rede)
+--------------------------------------------------------------------------------
+Copie da pasta do projeto (GitHub / seu PC) para a pasta da rede:
+
+  Obrigatórios (código):
+    app.py, dashboard.py, database.py, planilha.py, alcoano.py
+    auth_fornecedor.py
+    gerar_codigos_fornecedores.py
+    requirements.txt
+    .env.example
+    .streamlit\config.toml
+    fornecedores_codigos.json.example
+
+  Dados (NÃO vão no Git — coloque na pasta local ou na rede com cuidado):
+    .env                         (copiar de .env.example e preencher)
+    relatorio_fup.xlsm           (planilha FUP)
+    fornecedores_codigos.json    (códigos de login)
+
+  Opcional:
+    README.md, GUIA_IMPLANTACAO.md, APRESENTACAO.html
+    setup_outro_pc.bat, rodar_formulario.bat, rodar_dashboard.bat
+
+
+--------------------------------------------------------------------------------
+PASSO 2 — Preparar o PC (primeira vez)
+--------------------------------------------------------------------------------
+Opção recomendada (local):
+
+  1. Copie a pasta do projeto para:
+       C:\Projetos\FormularioFornecedores
+
+  2. Confirme que .env, relatorio_fup.xlsm e fornecedores_codigos.json
+     estão nesta pasta local.
+
+  3. Duplo clique em:
+       setup_outro_pc.bat
+
+     Isso cria a pasta venv\ e instala as dependências.
+
+
+--------------------------------------------------------------------------------
+PASSO 3 — Rodar o app
+--------------------------------------------------------------------------------
+  Duplo clique:
+    rodar_formulario.bat      → http://localhost:8501
+    rodar_dashboard.bat       → dashboard (com login)
+
+  Ou no terminal (com venv ativo):
+    venv\Scripts\activate
+    streamlit run app.py
+    streamlit run dashboard.py
+
+
+--------------------------------------------------------------------------------
+SE O PC NÃO TEM PYTHON
+--------------------------------------------------------------------------------
+O projeto NÃO roda sem Python. Peça à TI UMA destas opções:
+
+  1) Instalar Python 3.11 ou 3.12 (recomendado)
+     - https://www.python.org/downloads/
+     - Marque "Add python.exe to PATH"
+     - Depois rode setup_outro_pc.bat
+
+  2) Python da Microsoft Store (se liberado pela TI)
+
+  3) Python portátil (sem instalação no sistema)
+     - Baixe "Windows embeddable package" ou distribuição portátil
+       autorizada pela TI (ex.: WinPython)
+     - Coloque em C:\PythonPortable\
+     - Edite setup_outro_pc.bat e aponte o caminho do python.exe
+       (variável PYTHON_EXE no início do script)
+
+  4) Uso só na nuvem (sem Python no PC)
+     - Formulário: Streamlit Cloud (já usado)
+     - Dashboard: Streamlit Cloud com Secrets
+     - Neste caso o PC só precisa de navegador
+
+
+--------------------------------------------------------------------------------
+MAPEAR A PASTA DE REDE (já no projeto)
+--------------------------------------------------------------------------------
+Duplo clique:
+  mapear_rede_alcoa.bat
+
+Equivale a:
+  net use V: "\\noa.alcoa.com\dfs\PGH\InfoShare1\GSS_PMO\AA_Static\116_PSC_PO_Followup\Alumar-operação\Vitoria" /persistent:yes
+
+Para mudar unidade ou pasta, edite:
+  caminhos_rede_alcoa.bat
+
+
+--------------------------------------------------------------------------------
+ESTRUTURA SUGERIDA (arrumada)
+--------------------------------------------------------------------------------
+Rede (compartilhada — caminho já mapeado):
+  V:\FormularioFornecedores\                 ← publicar/atualizar a equipe aqui
+    (código + docs; sem .env com senhas reais se possível)
+
+Local (onde PYTHON roda):
+C:\Projetos\FormularioFornecedores\          ← rode daqui
+  app.py
+  dashboard.py
+  ...
+  .env
+  relatorio_fup.xlsm
+  fornecedores_codigos.json
+  venv\
+  caminhos_rede_alcoa.bat
+  mapear_rede_alcoa.bat
+  copiar_rede_para_local.bat
+  setup_outro_pc.bat
+  rodar_formulario.bat
+  rodar_dashboard.bat
+
+
+--------------------------------------------------------------------------------
+CHECKLIST RÁPIDO
+--------------------------------------------------------------------------------
+[ ] Python 3.11+ no PATH (python --version)
+[ ] Pasta do projeto no disco LOCAL (não UNC)
+[ ] Arquivo .env preenchido (Supabase)
+[ ] relatorio_fup.xlsm na pasta
+[ ] fornecedores_codigos.json na pasta (para login local)
+[ ] setup_outro_pc.bat executado com sucesso
+[ ] Portas 8501/8502 liberadas no firewall local (se necessário)
+
+================================================================================

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Formulário Fornecedores - MVP até Produção</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --accent: #1e3a5f;
+      --mvp: #059669;
+      --basica: #2563eb;
+      --forte: #7c3aed;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem;
+      line-height: 1.5;
+    }
+    .wrap { max-width: 1150px; margin: 0 auto; }
+    h1 { color: var(--accent); font-size: 1.6rem; margin-bottom: 0.25rem; }
+    .sub { color: var(--muted); margin-bottom: 2rem; }
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    h2 {
+      font-size: 1.1rem;
+      color: var(--accent);
+      margin-top: 0;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+      border-bottom: 2px solid #c8102e;
+    }
+    .mermaid { display: flex; justify-content: center; overflow-x: auto; }
+    .fases {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .fase {
+      border-radius: 10px;
+      padding: 1rem;
+      border: 1px solid var(--border);
+    }
+    .fase h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+    .fase ul { margin: 0; padding-left: 1.2rem; font-size: 0.88rem; }
+    .fase.mvp { border-top: 4px solid var(--mvp); }
+    .fase.mvp h3 { color: var(--mvp); }
+    .fase.basica { border-top: 4px solid var(--basica); }
+    .fase.basica h3 { color: var(--basica); }
+    .fase.forte { border-top: 4px solid var(--forte); }
+    .fase.forte h3 { color: var(--forte); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.6rem 0.8rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--accent); color: #fff; }
+    tr:nth-child(even) { background: #f1f5f9; }
+    .tag {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .tag-mvp { background: var(--mvp); }
+    .tag-basica { background: var(--basica); }
+    .tag-forte { background: var(--forte); }
+    pre.timeline {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 1.25rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .hint {
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 0.85rem 1rem;
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      border-radius: 0 8px 8px 0;
+    }
+    @media print {
+      body { background: #fff; padding: 0.5rem; }
+      section { box-shadow: none; break-inside: avoid; }
+      .fases { grid-template-columns: 1fr; }
+      .hint { display: none; }
+    }
+    @media (max-width: 900px) {
+      .fases { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Formulário de Fornecedores Alcoa</h1>
+    <p class="sub">Jornada completa: MVP → Produção básica → Produção forte (segurança e observabilidade)</p>
+
+    <section>
+      <h2>Roadmap - visão geral</h2>
+      <div class="mermaid">
+flowchart LR
+    subgraph mvp [MVP]
+        direction TB
+        M1[Streamlit Cloud]
+        M2[Login ID fornecedor]
+        M3[Dashboard user+senha]
+        M4[Supabase + Storage FUP]
+        M5[JSON códigos local]
+    end
+
+    subgraph basica [Produção básica]
+        direction TB
+        B1[Domínio Alcoa]
+        B2[Senha em hash]
+        B3[Tabela fornecedores]
+        B4[RLS revisada]
+        B5[Backup diário]
+    end
+
+    subgraph forte [Produção forte]
+        direction TB
+        F1[Docker / Azure]
+        F2[SSO Azure AD]
+        F3[VPN dashboard]
+        F4[API / SAP]
+        F5[Logs e alertas]
+    end
+
+    mvp -->|oficializar| basica
+    basica -->|compliance TI| forte
+
+    mvp --- MS[Seg: ID + senha + Secrets]
+    mvp --- MO[Obs: codigo_fornecedor + Excel]
+
+    basica --- BS[Seg: hash + IDs fixos + RLS]
+    basica --- BO[Obs: backup + domínio + logs]
+
+    forte --- FS[Seg: SSO + VPN + cofre]
+    forte --- FO[Obs: Splunk + auditoria]
+      </div>
+    </section>
+
+    <section>
+      <h2>Fluxo detalhado por fase</h2>
+      <div class="mermaid">
+flowchart TB
+    FORN[Fornecedor externo]
+    EQUIPE[Equipe Alcoa interna]
+
+    subgraph fase1 [Fase 1 - MVP]
+        F1A[app.py - formulário público]
+        F1B[dashboard.py - acesso restrito]
+        F1C[(Supabase)]
+        F1D[Storage FUP]
+        F1E[fornecedores_codigos.json]
+        F1S[Segurança: ID · senha dash · HTTPS · fora do Git]
+        F1O[Observabilidade: timestamps · export · Table Editor]
+    end
+
+    subgraph fase2 [Fase 2 - Produção básica]
+        F2A[Mesmos apps - domínio *.alcoa.com.br]
+        F2B[Tabela fornecedores no Supabase]
+        F2C[DASHBOARD_USERS_JSON com hash]
+        F2S[Segurança: RLS · IDs estáveis · senha forte]
+        F2O[Observabilidade: backup auto · logs de erro]
+    end
+
+    subgraph fase3 [Fase 3 - Produção forte]
+        F3A[Containers Azure / VM]
+        F3B[Key Vault - secrets]
+        F3C[PostgreSQL corporativo ou Supabase Pro]
+        F3D[Integração SAP / API FUP]
+        F3S[Segurança: SSO · VPN · WAF · rate limit]
+        F3O[Observabilidade: monitoramento · alertas · auditoria]
+    end
+
+    FORN --> F1A
+    EQUIPE --> F1B
+    F1A --> F1C
+    F1A --> F1D
+    F1A --> F1E
+    F1B --> F1C
+    F1S -.-> F1A
+    F1O -.-> F1C
+
+    fase1 ==> fase2
+    fase2 ==> fase3
+
+    F2A --> F2B
+    F2A --> F2C
+    F2S -.-> F2A
+    F2O -.-> F2C
+
+    F3A --> F3B
+    F3A --> F3C
+    F3A --> F3D
+    F3S -.-> F3A
+    F3O -.-> F3C
+      </div>
+    </section>
+
+    <section>
+      <h2>Linha do tempo</h2>
+      <pre class="timeline">MVP (agora)          Produção básica (2–4 sem)     Produção forte (1–3 meses+)
+─────────────────    ─────────────────────────    ─────────────────────────────
+Streamlit Cloud  →   Domínio Alcoa            →   Azure / Docker
+ID fornecedor    →   IDs no banco             →   Token / e-mail / SAP
+Senha dashboard  →   Senha em hash            →   SSO Azure AD
+JSON local       →   Tabela fornecedores      →   Master data SAP
+RLS aberta       →   RLS revisada             →   Políticas corporativas
+Export manual    →   Backup diário            →   Splunk / alertas
+Piloto           →   Processo oficializado    →   Compliance total</pre>
+    </section>
+
+    <section>
+      <h2>As três fases - resumo</h2>
+      <div class="fases">
+        <div class="fase mvp">
+          <h3><span class="tag tag-mvp">MVP</span> Piloto</h3>
+          <p><strong>Objetivo:</strong> validar processo com fornecedores reais.</p>
+          <ul>
+            <li>Formulário com login por ID</li>
+            <li>Dashboard com usuário/senha</li>
+            <li>Supabase + FUP no Storage</li>
+            <li>Streamlit Cloud</li>
+            <li>Secrets fora do Git</li>
+          </ul>
+          <p><strong>Prazo:</strong> já em andamento</p>
+        </div>
+        <div class="fase basica">
+          <h3><span class="tag tag-basica">Básica</span> Oficializar</h3>
+          <p><strong>Objetivo:</strong> uso formal com pouco esforço extra.</p>
+          <ul>
+            <li>Domínio fornecedores.alcoa.com.br</li>
+            <li>IDs estáveis (tabela fornecedores)</li>
+            <li>Senha dashboard em hash</li>
+            <li>Backup automático Supabase</li>
+            <li>RLS revisada</li>
+          </ul>
+          <p><strong>Prazo:</strong> 2–4 semanas</p>
+        </div>
+        <div class="fase forte">
+          <h3><span class="tag tag-forte">Forte</span> Corporativo</h3>
+          <p><strong>Objetivo:</strong> padrão TI Alcoa / compliance.</p>
+          <ul>
+            <li>Azure Container Apps / App Service</li>
+            <li>SSO (Azure AD) no dashboard</li>
+            <li>VPN - dashboard só intranet</li>
+            <li>FUP via API / SAP</li>
+            <li>Logs, alertas, auditoria</li>
+          </ul>
+          <p><strong>Prazo:</strong> 1–3 meses+</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Segurança e observabilidade - comparativo</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Aspecto</th>
+            <th>MVP</th>
+            <th>Produção básica</th>
+            <th>Produção forte</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Acesso fornecedor</strong></td>
+            <td>ID numérico (código)</td>
+            <td>ID fixo no banco</td>
+            <td>E-mail + token ou código SAP</td>
+          </tr>
+          <tr>
+            <td><strong>Acesso equipe</strong></td>
+            <td>Usuário + senha (Secrets)</td>
+            <td>Senha em hash, vários usuários</td>
+            <td>SSO Azure AD + VPN</td>
+          </tr>
+          <tr>
+            <td><strong>Dados sensíveis</strong></td>
+            <td>Fora do Git, Storage Supabase</td>
+            <td>+ backup diário</td>
+            <td>Key Vault, rede interna</td>
+          </tr>
+          <tr>
+            <td><strong>Banco</strong></td>
+            <td>Supabase free/pro, RLS aberta</td>
+            <td>RLS revisada, índice único</td>
+            <td>PostgreSQL corporativo</td>
+          </tr>
+          <tr>
+            <td><strong>Rastreio envios</strong></td>
+            <td>codigo_fornecedor + timestamps</td>
+            <td>+ IDs estáveis</td>
+            <td>+ auditoria completa</td>
+          </tr>
+          <tr>
+            <td><strong>Visualização</strong></td>
+            <td>Dashboard + export Excel</td>
+            <td>+ domínio corporativo</td>
+            <td>+ Power BI / logs Splunk</td>
+          </tr>
+          <tr>
+            <td><strong>Infraestrutura</strong></td>
+            <td>Streamlit Cloud</td>
+            <td>Docker ou Cloud + CNAME</td>
+            <td>Azure aprovado pela TI</td>
+          </tr>
+          <tr>
+            <td><strong>Quem aprova</strong></td>
+            <td>Equipe do projeto</td>
+            <td>Gestor + compras</td>
+            <td>TI + segurança + compliance</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Componentes do sistema (em todas as fases)</h2>
+      <div class="mermaid">
+flowchart TB
+    subgraph apps [Aplicações - evoluem de hospedagem]
+        APP[app.py - Formulário fornecedor]
+        DASH[dashboard.py - Dashboard equipe]
+    end
+
+    subgraph dados [Dados - evoluem de origem]
+        DB[(Respostas - formulario)]
+        FUP[Pedidos - FUP / SAP]
+        IDS[Cadastro - JSON → tabela → SAP]
+    end
+
+    subgraph sempre [Em todas as fases]
+        S1[Fornecedor isolado por empresa]
+        S2[Dashboard só equipe interna]
+        S3[Resposta rastreável]
+    end
+
+    APP --> DB
+    APP --> FUP
+    APP --> IDS
+    DASH --> DB
+    sempre --> APP
+    sempre --> DASH
+      </div>
+      <p style="font-size:0.9rem;color:var(--muted);margin:1rem 0 0;">
+        O <strong>processo</strong> permanece: fornecedor envia → Supabase grava → equipe consulta.
+        O que muda entre fases é <strong>como</strong> se protege e <strong>onde</strong> se hospeda.
+      </p>
+    </section>
+
+    <p class="hint">
+      <strong>Para baixar:</strong> abra no navegador → <kbd>Ctrl</kbd>+<kbd>P</kbd> → Salvar como PDF.
+    </p>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "neutral",
+      flowchart: { curve: "basis", padding: 14, htmlLabels: true }
+    });
+  </script>
+</body>
+</html>

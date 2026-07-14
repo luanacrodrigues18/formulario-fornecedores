@@ -574,3 +574,114 @@ def carregar_respostas() -> list[dict[str, Any]]:
 def data_promessa_inicial(registro: dict[str, Any]) -> date:
     data_base = _converter_data(registro.get("data_promessa_base"))
     return data_base or date.today()
+
+
+def exportar_retorno_fup_excel(
+    respostas: list[dict[str, Any]] | None = None,
+    destino: Path | None = None,
+) -> dict[str, Any]:
+    """
+    Gera um Excel NOVO (não altera relatorio_fup.xlsm) com:
+      - Colunas verdes (pesquisa): PO com Release + Número da linha
+      - Colunas amarelas (retorno): Data da Promessa, Observações, NF
+      - Status do relacionamento com a aba Follow-up-Release
+    """
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    if respostas is None:
+        from database import buscar_todos
+
+        respostas = buscar_todos()
+
+    garantir_arquivo_fup()
+    carregar_base_fup.cache_clear()
+    base_por_chave: dict[tuple[str, str], dict[str, Any]] = {}
+    for registro_fup in carregar_base_fup():
+        chave = _chave_po_linha(
+            registro_fup.get("numero_po_com_release", ""),
+            registro_fup.get("numero_linha", ""),
+        )
+        if chave[0] and chave[1] and chave not in base_por_chave:
+            base_por_chave[chave] = registro_fup
+
+    fill_verde = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+    fill_amarelo = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+    fill_cab = PatternFill(start_color="1E3A5F", end_color="1E3A5F", fill_type="solid")
+    font_cab = Font(bold=True, color="FFFFFF")
+
+    cabecalhos = [
+        ("Número do PO com Release", fill_verde),
+        ("Informe o número da linha", fill_verde),
+        ("Data da Promessa", fill_amarelo),
+        ("Observações de Coleta", fill_amarelo),
+        ("Número da NF", fill_amarelo),
+        ("Match na FUP", fill_cab),
+        ("Fornecedor (FUP)", fill_cab),
+        ("Linha Excel FUP", fill_cab),
+        ("ID resposta", fill_cab),
+        ("Email", fill_cab),
+        ("Nome", fill_cab),
+    ]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Retorno_Formulario"
+
+    for col_idx, (titulo, fill) in enumerate(cabecalhos, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=titulo)
+        cell.fill = fill if fill != fill_cab else fill_cab
+        if col_idx <= 2:
+            cell.fill = fill_verde
+            cell.font = Font(bold=True, color="006100")
+        elif col_idx <= 5:
+            cell.fill = fill_amarelo
+            cell.font = Font(bold=True, color="9C5700")
+        else:
+            cell.fill = fill_cab
+            cell.font = font_cab
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    encontrados = 0
+    nao_encontrados = 0
+
+    for row_idx, reg in enumerate(respostas, start=2):
+        chave = _chave_po_linha(
+            reg.get("numero_po_com_release", ""),
+            reg.get("numero_linha", ""),
+        )
+        fup = base_por_chave.get(chave)
+        match = "Sim" if fup else "Não"
+        if fup:
+            encontrados += 1
+        else:
+            nao_encontrados += 1
+
+        data_val = _converter_data(reg.get("data_promessa"))
+        ws.cell(row=row_idx, column=1, value=_normalizar_texto(reg.get("numero_po_com_release", "")))
+        ws.cell(row=row_idx, column=2, value=_normalizar_texto(reg.get("numero_linha", "")))
+        ws.cell(row=row_idx, column=3, value=data_val or _normalizar_texto(reg.get("data_promessa", "")))
+        ws.cell(row=row_idx, column=4, value=_normalizar_texto(reg.get("observacoes_coleta", "")))
+        ws.cell(row=row_idx, column=5, value=_normalizar_texto(reg.get("numero_nf", "")))
+        ws.cell(row=row_idx, column=6, value=match)
+        ws.cell(row=row_idx, column=7, value=(fup or {}).get("fornecedor", ""))
+        ws.cell(row=row_idx, column=8, value=(fup or {}).get("indice_base", ""))
+        ws.cell(row=row_idx, column=9, value=reg.get("id", ""))
+        ws.cell(row=row_idx, column=10, value=_normalizar_texto(reg.get("email", "")))
+        ws.cell(row=row_idx, column=11, value=_normalizar_texto(reg.get("nome", "")))
+
+    larguras = [28, 22, 18, 35, 18, 14, 40, 16, 12, 30, 25]
+    for idx, largura in enumerate(larguras, start=1):
+        ws.column_dimensions[get_column_letter(idx)].width = largura
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(cabecalhos))}{max(1, len(respostas) + 1)}"
+
+    if destino is None:
+        destino = BASE_DIR / f"fup_retorno_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    wb.save(destino)
+
+    return {
+        "arquivo": str(destino),
+        "total": len(respostas),
+        "encontrados": encontrados,
+        "nao_encontrados": nao_encontrados,
+    }

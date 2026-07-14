@@ -5,5 +5,10 @@ __pycache__/
 formulario_respostas.xlsx
 dados_locais.json
 relatorio_fup.xlsm
+fup_retorno_*.xlsx
 fornecedores_codigos.json
 fornecedores_codigos_lista.txt
+
+# Arquivos temporarios do Excel
+~$*
+

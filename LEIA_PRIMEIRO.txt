@@ -1,0 +1,95 @@
+========================================================================
+  LEIA ISTO PRIMEIRO  —  para quem vai receber o projeto
+========================================================================
+
+Oi! Você não precisa entender de programação.
+Siga só estes passos, na ordem.
+
+
+------------------------------------------------------------------------
+O QUE VOCÊ VAI USAR
+------------------------------------------------------------------------
+  Formulário  = o que o fornecedor preenche (pode ser pela internet)
+  Dashboard   = tela interna da Alcoa para ver as respostas
+
+Tem DOIS jeitos. Escolha UM:
+
+
+========================================================================
+JEITO A — SÓ PELA INTERNET (mais fácil)
+========================================================================
+Não precisa instalar nada no computador.
+
+1. Peça para a pessoa que te passou o projeto:
+     - o LINK do formulário (Streamlit)
+     - o LINK do dashboard (só você / uso interno)
+
+2. Abra o link no Chrome ou Edge
+3. Pronto.
+
+
+========================================================================
+JEITO B — NO COMPUTADOR (se precisar rodar local)
+========================================================================
+
+PASSO 1 — Python no PC
+  Dê duplo clique em:  verificar_python.bat
+
+  - Se aparecer [OK] em tudo → vá para o PASSO 2
+  - Se aparecer [FALHOU] → peça à TI:
+      "Preciso do Python 3.12 instalado, com Add to PATH"
+    Depois rode de novo o verificar_python.bat
+
+
+PASSO 2 — Preparar a pasta (só na primeira vez)
+  Dê duplo clique em:  INICIAR.bat
+
+  Ele vai:
+    - perguntar o que você quer fazer
+    - criar o ambiente
+    - abrir o formulário ou o dashboard
+
+
+PASSO 3 — No dia a dia
+  Duplo clique de novo em:  INICIAR.bat
+  Escolha:
+    1 = Formulário
+    2 = Dashboard
+
+  No Dashboard, se quiser exportar as respostas relacionadas à FUP
+  (sem alterar o Excel principal):
+    "Exportar retorno para Excel (sem mexer na FUP)"
+
+
+------------------------------------------------------------------------
+SE FOR USAR A PASTA DA REDE ALCOA
+------------------------------------------------------------------------
+1. Duplo clique:  mapear_rede_alcoa.bat
+2. Duplo clique:  copiar_rede_para_local.bat
+3. Vá na pasta:   C:\Projetos\FormularioFornecedores
+4. Lá, duplo clique:  INICIAR.bat
+
+NÃO tente rodar direto pelo caminho que começa com \\noa.alcoa.com\...
+
+
+------------------------------------------------------------------------
+O QUE VOCÊ NÃO PRECISA FAZER
+------------------------------------------------------------------------
+  - Não precisa saber programar
+  - Não precisa abrir código
+  - Não precisa usar o GitHub se te passarem a pasta pronta
+  - Não mexa em arquivos .py se não pedirem
+
+
+------------------------------------------------------------------------
+SE TRAVAR
+------------------------------------------------------------------------
+Mande mensagem para quem te passou o projeto com:
+  1. Print da tela de erro
+  2. O que você clicou (nome do .bat)
+
+Ou leia:
+  COMO_INSTALAR_PYTHON.txt   → se faltar Python
+  COMO_RODAR_OUTRO_PC.txt    → detalhes técnicos
+
+========================================================================

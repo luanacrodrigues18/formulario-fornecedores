@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formulário de Fornecedores — Apresentação</title>
+  <style>
+    :root {
+      --alcoa-blue: #1e3a5f;
+      --alcoa-light: #eef4fb;
+      --alcoa-accent: #2563eb;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #cbd5e1;
+      --bg: #f8fafc;
+      --white: #ffffff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      height: 100vh;
+    }
+    .slide {
+      display: none;
+      height: 100vh;
+      padding: 3rem 4rem 5rem;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .slide.active { display: flex; animation: fadeIn 0.35s ease; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .slide-cover {
+      background: var(--alcoa-blue);
+      color: var(--white);
+      text-align: center;
+      align-items: center;
+    }
+    .slide-cover h1 { color: var(--white); font-size: 3rem; }
+    .slide-cover .subtitle { color: #b8cfe8; font-size: 1.35rem; margin-top: 1rem; }
+    .slide-cover .meta { color: #94a3b8; margin-top: 2.5rem; font-size: 0.95rem; }
+    h1 { font-size: 2.6rem; font-weight: 700; color: var(--alcoa-blue); }
+    h2 { font-size: 1.75rem; font-weight: 700; color: var(--alcoa-blue); margin-bottom: 1.75rem; }
+    h3 { font-size: 1.1rem; font-weight: 700; color: var(--alcoa-blue); margin-bottom: 0.5rem; }
+    p, li { font-size: 1.15rem; line-height: 1.65; }
+    ul { margin: 0.75rem 0 0 1.5rem; }
+    li { margin-bottom: 0.55rem; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; margin-top: 1rem; }
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.4rem;
+    }
+    .card p { font-size: 1rem; color: var(--muted); }
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      background: var(--alcoa-blue);
+      color: var(--white);
+      border-radius: 50%;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+    .flow { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 1.25rem 0; }
+    .flow-box {
+      background: var(--alcoa-light);
+      border: 1px solid #b8cfe8;
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      font-weight: 600;
+      color: var(--alcoa-blue);
+    }
+    .flow-arrow { color: var(--muted); font-size: 1.4rem; }
+    .arch {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+      font-family: Consolas, monospace;
+      font-size: 0.95rem;
+      line-height: 1.9;
+      color: var(--alcoa-blue);
+      white-space: pre;
+    }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+    .tag {
+      background: var(--alcoa-light);
+      border: 1px solid #b8cfe8;
+      color: var(--alcoa-blue);
+      padding: 0.4rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 1rem; }
+    th, td { border: 1px solid var(--border); padding: 0.65rem 1rem; text-align: left; }
+    th { background: var(--alcoa-light); color: var(--alcoa-blue); }
+    .nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 2rem;
+      background: var(--white);
+      border-top: 1px solid var(--border);
+    }
+    .nav button {
+      background: var(--alcoa-blue);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      padding: 0.55rem 1.25rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .nav button:disabled { background: #94a3b8; cursor: not-allowed; }
+    .progress { color: var(--muted); font-size: 0.9rem; }
+    .highlight {
+      background: var(--alcoa-light);
+      border-left: 4px solid var(--alcoa-accent);
+      padding: 1rem 1.25rem;
+      border-radius: 0 8px 8px 0;
+      margin-top: 1.25rem;
+    }
+    .muted { color: var(--muted); font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <section class="slide slide-cover active">
+    <p style="font-size:3.5rem">📋</p>
+    <h1>Formulário de Fornecedores</h1>
+    <p class="subtitle">Coleta digital de promessas de entrega e follow-up de pedidos</p>
+    <p class="meta">Alcoa · Login por código · 2026</p>
+  </section>
+
+  <section class="slide">
+    <h2>Contexto e desafio</h2>
+    <ul>
+      <li>Operação baseada na planilha <strong>FUP</strong> com centenas de pedidos.</li>
+      <li>~280 fornecedores precisam informar data de promessa, observações e NF.</li>
+      <li>Coleta manual era descentralizada e difícil de rastrear.</li>
+      <li>Equipe Alcoa precisa de visão consolidada e exportação.</li>
+    </ul>
+    <div class="highlight">Cada fornecedor deve ver <strong>somente os próprios pedidos</strong>.</div>
+  </section>
+
+  <section class="slide">
+    <h2>Objetivo</h2>
+    <div class="grid-2">
+      <div class="card"><h3>Fornecedor</h3><p>Formulário web simples, 3 passos, com assistente ALUX.</p></div>
+      <div class="card"><h3>Alcoa</h3><p>Dashboard com filtros, gráficos e exportação Excel.</p></div>
+      <div class="card"><h3>Segurança</h3><p>Login por código exclusivo por empresa.</p></div>
+      <div class="card"><h3>Nuvem</h3><p>Streamlit Cloud + Supabase, sem instalar software.</p></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <h2>Funcionalidades</h2>
+    <div class="grid-3">
+      <div class="card"><h3>Login por código</h3><p>ID enviado pela Alcoa.</p></div>
+      <div class="card"><h3>3 passos</h3><p>Buscar → linha → enviar.</p></div>
+      <div class="card"><h3>ALUX</h3><p>Dicas e FAQ na sidebar.</p></div>
+      <div class="card"><h3>Minhas respostas</h3><p>Histórico na sessão.</p></div>
+      <div class="card"><h3>Dashboard</h3><p>Visão interna da equipe.</p></div>
+      <div class="card"><h3>Supabase</h3><p>Banco + Storage na nuvem.</p></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <h2>Fluxo do fornecedor</h2>
+    <div class="grid-3">
+      <div class="card"><div class="step-num">1</div><h3>Login</h3><p>Entra com o código recebido.</p></div>
+      <div class="card"><div class="step-num">2</div><h3>Busca</h3><p>PO/Release ou todos os pedidos.</p></div>
+      <div class="card"><div class="step-num">3</div><h3>Envio</h3><p>Preenche e recebe protocolo.</p></div>
+    </div>
+    <div class="flow">
+      <span class="flow-box">Código</span><span class="flow-arrow">→</span>
+      <span class="flow-box">Nome</span><span class="flow-arrow">→</span>
+      <span class="flow-box">Pedidos FUP</span><span class="flow-arrow">→</span>
+      <span class="flow-box">Supabase</span>
+    </div>
+  </section>
+
+  <section class="slide">
+    <h2>Autenticação</h2>
+    <ul>
+      <li><code>fornecedores_codigos.json</code> mapeia ID → nome do fornecedor.</li>
+      <li>Gerado com <code>gerar_codigos_fornecedores.py</code> a partir da FUP.</li>
+      <li>Na nuvem: FUP e JSON baixados do Supabase Storage (bucket Form).</li>
+      <li>Um envio por PO + linha (sem duplicata).</li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <h2>Dashboard Alcoa</h2>
+    <ul>
+      <li>Todos os envios em tempo real</li>
+      <li>Filtros por fornecedor, PO, data e status</li>
+      <li>Top 10 fornecedores (gráfico)</li>
+      <li>Exportação Excel formatada</li>
+      <li>Links diretos para o formulário</li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <h2>Arquitetura</h2>
+    <div class="arch">Fornecedor → Streamlit Cloud (app.py)
+    ↓                    ↓
+Supabase Storage    PostgreSQL (formulario)
+    ↑
+Equipe Alcoa → dashboard.py</div>
+    <div class="tag-row">
+      <span class="tag">app.py</span><span class="tag">auth_fornecedor.py</span>
+      <span class="tag">planilha.py</span><span class="tag">database.py</span>
+      <span class="tag">dashboard.py</span><span class="tag">alcoano.py</span>
+    </div>
+  </section>
+
+  <section class="slide">
+    <h2>Stack tecnológico</h2>
+    <table>
+      <tr><th>Camada</th><th>Tecnologia</th></tr>
+      <tr><td>Interface</td><td>Streamlit</td></tr>
+      <tr><td>Backend</td><td>Python 3.11+</td></tr>
+      <tr><td>Banco</td><td>Supabase (PostgreSQL)</td></tr>
+      <tr><td>Arquivos</td><td>Supabase Storage</td></tr>
+      <tr><td>Planilha</td><td>openpyxl + pandas</td></tr>
+      <tr><td>Deploy</td><td>Streamlit Cloud + GitHub</td></tr>
+    </table>
+  </section>
+
+  <section class="slide">
+    <h2>Dados coletados</h2>
+    <table>
+      <tr><th>Campo</th><th>Descrição</th></tr>
+      <tr><td>Email / Nome</td><td>Responsável</td></tr>
+      <tr><td>Código fornecedor</td><td>ID de login</td></tr>
+      <tr><td>PO + Linha</td><td>Pedido selecionado</td></tr>
+      <tr><td>Data promessa</td><td>Informada pelo fornecedor</td></tr>
+      <tr><td>Observações / NF</td><td>Complementos</td></tr>
+    </table>
+  </section>
+
+  <section class="slide">
+    <h2>Produção</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Formulário</h3>
+        <p>formulario-fornecedores.streamlit.app</p>
+      </div>
+      <div class="card">
+        <h3>GitHub</h3>
+        <p>github.com/luanacrodrigues18/formulario-fornecedores</p>
+      </div>
+    </div>
+    <ul style="margin-top:1.25rem">
+      <li>Secrets: SUPABASE_URL, SUPABASE_KEY, SUPABASE_STORAGE_BUCKET</li>
+      <li>Storage: relatorio_fup.xlsm + fornecedores_codigos.json</li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <h2>Próximos passos</h2>
+    <ul>
+      <li>Tabela fornecedores no Supabase</li>
+      <li>SSO / Azure AD</li>
+      <li>Integração SAP</li>
+      <li>Notificações por e-mail</li>
+      <li>Revisão RLS para produção</li>
+    </ul>
+  </section>
+
+  <section class="slide slide-cover">
+    <h1>Obrigado!</h1>
+    <p class="subtitle">Formulário de Fornecedores — Alcoa</p>
+    <p class="meta">← → para navegar · F11 tela cheia · Ctrl+P para PDF</p>
+  </section>
+
+  <nav class="nav">
+    <button id="prev" disabled>Anterior</button>
+    <span class="progress" id="progress">1 / 13</span>
+    <button id="next">Próximo</button>
+  </nav>
+
+  <script>
+    const slides = document.querySelectorAll(".slide");
+    let current = 0;
+    function show(i) {
+      slides[current].classList.remove("active");
+      current = Math.max(0, Math.min(i, slides.length - 1));
+      slides[current].classList.add("active");
+      document.getElementById("progress").textContent = `${current + 1} / ${slides.length}`;
+      document.getElementById("prev").disabled = current === 0;
+      document.getElementById("next").disabled = current === slides.length - 1;
+    }
+    document.getElementById("prev").onclick = () => show(current - 1);
+    document.getElementById("next").onclick = () => show(current + 1);
+    document.onkeydown = (e) => {
+      if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); show(current + 1); }
+      if (e.key === "ArrowLeft") { e.preventDefault(); show(current - 1); }
+    };
+  </script>
+</body>
+</html>

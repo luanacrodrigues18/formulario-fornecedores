@@ -22,7 +22,8 @@ from database import (
     supabase_configurado,
     valor_vazio,
 )
-from planilha import buscar_por_po_e_linha, montar_link_formulario
+from planilha import buscar_por_po_e_linha, montar_link_formulario, exportar_retorno_fup_excel
+from pathlib import Path
 
 st.set_page_config(
     page_title="Dashboard - Fornecedores",
@@ -373,6 +374,39 @@ with st.expander("🔗 Gerar link para fornecedor", expanded=False):
             st.caption(f"Pedido encontrado no FUP: **{fornecedor}** — copie o link e envie por e-mail.")
         else:
             st.warning("PO/linha não encontrados no FUP. Verifique os dados antes de enviar o link.")
+
+# ── Exportar retorno (sem alterar o .xlsm) ───────────────────────────────────
+with st.expander("📥 Exportar retorno para Excel (sem mexer na FUP)", expanded=False):
+    st.markdown(
+        """
+        Gera um **Excel novo** com relacionamento:
+
+        - **Verde (pesquisa):** PO com Release + Número da linha  
+        - **Amarelo (retorno):** Data da Promessa, Observações de Coleta, Número da NF  
+
+        **Não altera** o `relatorio_fup.xlsm`. Serve para conferir o match e, se quiser,
+        fazer *PROCV* / Power Query na planilha principal depois.
+        """
+    )
+    if st.button("Gerar Excel de retorno", type="primary", key="btn_export_retorno_fup"):
+        try:
+            resultado = exportar_retorno_fup_excel(registros)
+            caminho = Path(resultado["arquivo"])
+            st.success(
+                f"Arquivo gerado: **{caminho.name}** · "
+                f"Match na FUP: **{resultado['encontrados']}** · "
+                f"Sem match: **{resultado['nao_encontrados']}**"
+            )
+            st.download_button(
+                label="⬇️ Baixar Excel de retorno",
+                data=caminho.read_bytes(),
+                file_name=caminho.name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_retorno_fup",
+            )
+            st.caption(f"Também salvo na pasta do projeto: `{caminho.name}`")
+        except Exception as exc:
+            st.error(f"Erro ao gerar Excel: {exc}")
 
 # ── Filtros ─────────────────────────────────────────────────────────────────
 st.subheader("Filtros")

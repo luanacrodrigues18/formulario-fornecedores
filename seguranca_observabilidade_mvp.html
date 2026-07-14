@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Formulário Fornecedores - Segurança e Observabilidade (MVP)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --accent: #1e3a5f;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem;
+      line-height: 1.5;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    h1 {
+      color: var(--accent);
+      font-size: 1.6rem;
+      margin-bottom: 0.25rem;
+    }
+    .sub { color: var(--muted); margin-bottom: 2rem; }
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    h2 {
+      font-size: 1.1rem;
+      color: var(--accent);
+      margin-top: 0;
+      border-bottom: 2px solid #c8102e;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .mermaid { display: flex; justify-content: center; overflow-x: auto; }
+    pre.flow {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 1.25rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.65rem 0.85rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--accent); color: #fff; }
+    tr:nth-child(even) { background: #f1f5f9; }
+    .hint {
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 0.85rem 1rem;
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      border-radius: 0 8px 8px 0;
+    }
+    @media print {
+      body { background: #fff; padding: 0.5rem; }
+      section { box-shadow: none; break-inside: avoid; }
+      .hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Formulário de Fornecedores Alcoa</h1>
+    <p class="sub">Segurança e observabilidade - MVP, produção básica e produção forte</p>
+
+    <section>
+      <h2>Diagrama principal</h2>
+      <div class="mermaid">
+flowchart TB
+    subgraph usuarios [Usuários]
+        F[Fornecedor]
+        E[Equipe Alcoa]
+    end
+
+    subgraph mvp [MVP]
+        direction TB
+
+        subgraph seguranca_mvp [Segurança]
+            SM1[Login por ID - isolamento por empresa]
+            SM2[Dashboard: usuário + senha]
+            SM3[Secrets / .env fora do Git]
+            SM4[HTTPS - Streamlit Cloud]
+            SM5[FUP e JSON fora do repositório]
+            SM6[Bloqueio PO + linha duplicada]
+        end
+
+        subgraph apps [Aplicações]
+            direction LR
+            FORM[app.py - Formulário]
+            DASH[dashboard.py - Dashboard]
+        end
+
+        subgraph dados [Dados]
+            SUPA[(Supabase - tabela formulario)]
+            STOR[Storage - relatorio_fup.xlsm]
+            JSON[fornecedores_codigos.json]
+        end
+
+        subgraph observ_mvp [Observabilidade]
+            OM1[Registro com codigo_fornecedor]
+            OM2[Hora início / conclusão]
+            OM3[Dashboard: filtros e exportação]
+            OM4[Supabase Table Editor]
+            OM5[Erros exibidos no app]
+        end
+    end
+
+    subgraph prod_basica [Produção básica]
+        PB_S[Senha em hash · IDs estáveis · RLS revisada]
+        PB_O[Backup diário · domínio Alcoa · logs de erro]
+    end
+
+    subgraph prod_forte [Produção forte]
+        PF_S[SSO Azure AD · VPN no dashboard · API/SAP]
+        PF_O[Splunk / Monitor · alertas · auditoria de acesso]
+    end
+
+    F -->|ID| FORM
+    E -->|usuário + senha| DASH
+
+    seguranca_mvp --> FORM
+    seguranca_mvp --> DASH
+
+    FORM -->|envio| SUPA
+    FORM -->|consulta pedidos| STOR
+    FORM -->|resolve ID| JSON
+    DASH -->|lê respostas| SUPA
+
+    FORM --> observ_mvp
+    DASH --> observ_mvp
+    SUPA --> observ_mvp
+
+    mvp -.-> prod_basica
+    prod_basica -.-> prod_forte
+      </div>
+    </section>
+
+    <section>
+      <h2>Fluxo resumido</h2>
+      <pre class="flow">FORNECEDOR                          EQUIPE ALCOA
+     │                                    │
+     ▼                                    ▼
+┌─────────────┐                   ┌─────────────┐
+│  SEGURANÇA  │                   │  SEGURANÇA  │
+│  ID único   │                   │ user+senha  │
+│  só seus    │                   │ só interno  │
+│  pedidos    │                   │             │
+└──────┬──────┘                   └──────┬──────┘
+       │                                 │
+       ▼                                 ▼
+   app.py                          dashboard.py
+       │                                 │
+       ├──────────┬──────────────────────┤
+       ▼          ▼                      ▼
+   Supabase   Storage FUP          filtros / Excel
+       │          │                      │
+       └──────────┴──────────────────────┘
+                  │
+                  ▼
+         OBSERVABILIDADE
+    · quem enviou (codigo_fornecedor)
+    · quando (hora_inicio / conclusao)
+    · o quê (PO, linha, promessa)
+    · painel Supabase + export</pre>
+    </section>
+
+    <section>
+      <h2>MVP - Segurança e observabilidade</h2>
+      <table>
+        <thead>
+          <tr><th>Segurança</th><th>Observabilidade</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Login por ID do fornecedor</td><td>codigo_fornecedor em cada envio</td></tr>
+          <tr><td>Dashboard com usuário e senha</td><td>Timestamps de início e fim</td></tr>
+          <tr><td>Secrets fora do Git</td><td>Dashboard com métricas e filtros</td></tr>
+          <tr><td>FUP e JSON fora do GitHub</td><td>Export Excel para análise</td></tr>
+          <tr><td>HTTPS na nuvem</td><td>Table Editor no Supabase</td></tr>
+          <tr><td>1 envio por PO + linha</td><td>Mensagens de erro no app</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Evolução</h2>
+      <table>
+        <thead>
+          <tr><th>Fase</th><th>Segurança</th><th>Observabilidade</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Produção básica</strong></td>
+            <td>Hash de senha, IDs fixos, RLS revisada</td>
+            <td>Backup automático, domínio próprio</td>
+          </tr>
+          <tr>
+            <td><strong>Produção forte</strong></td>
+            <td>SSO, VPN, API SAP</td>
+            <td>Logs centralizados, alertas, auditoria</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <p class="hint">
+      <strong>Para baixar:</strong> abra este arquivo no navegador → <kbd>Ctrl</kbd>+<kbd>P</kbd> → Salvar como PDF.
+      Ou clique com o botão direito no diagrama → Salvar imagem (após carregar).
+    </p>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "neutral",
+      flowchart: { curve: "basis", padding: 16 }
+    });
+  </script>
+</body>
+</html>

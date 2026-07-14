@@ -1,0 +1,110 @@
+================================================================================
+  PYTHON NO PC ALCOA — COMO RESOLVER
+================================================================================
+
+O formulário (Streamlit) PRECISA de Python no PC para rodar local.
+Sem Python = não abre app.py / dashboard.py no computador.
+
+Opções, da mais simples à mais "sem instalação de sistema":
+
+
+--------------------------------------------------------------------------------
+OPÇÃO 1 — Pedir à TI (melhor para corporativo)
+--------------------------------------------------------------------------------
+Solicite instalação de:
+  - Python 3.11 ou 3.12 (64-bit)
+  - Com "Add python.exe to PATH" marcado
+
+Depois, no Prompt:
+  python --version
+
+Se aparecer Python 3.11+ , rode:
+  setup_outro_pc.bat
+
+
+--------------------------------------------------------------------------------
+OPÇÃO 2 — Microsoft Store (se liberada)
+--------------------------------------------------------------------------------
+1. Abra Microsoft Store
+2. Busque "Python 3.12" (ou 3.11)
+3. Instale
+4. Feche e abra um novo Prompt
+5. Teste: python --version
+6. Rode setup_outro_pc.bat
+
+
+--------------------------------------------------------------------------------
+OPÇÃO 3 — Python portátil (sem instalar no Windows)
+--------------------------------------------------------------------------------
+Use quando a TI NÃO deixa instalar, mas permite copiar pasta.
+
+1. No seu PC (com internet), baixe WinPython ou "embeddable":
+   - WinPython (mais fácil): https://winpython.github.io/
+   - Ou peça à TI um pacote portátil aprovado
+
+2. Extraia para, por exemplo:
+   C:\PythonPortable\
+
+3. Confirme que existe:
+   C:\PythonPortable\python.exe
+   (o caminho exato pode ser C:\PythonPortable\WPy64-312xxx\python\python.exe)
+
+4. Edite caminhos_rede_alcoa.bat e descomente/ajuste:
+   set "PYTHON_EXE=C:\PythonPortable\python.exe"
+
+   OU edite setup_outro_pc.bat:
+   set PYTHON_EXE=C:\PythonPortable\python.exe
+
+5. Rode setup_outro_pc.bat
+
+
+--------------------------------------------------------------------------------
+OPÇÃO 4 — Não instalar Python no PC (só nuvem)
+--------------------------------------------------------------------------------
+Se o outro PC NÃO pode ter Python:
+
+  - Formulário: use a URL do Streamlit Cloud no navegador
+  - Dashboard: use a URL do dashboard na nuvem
+
+Nesse caso o PC só precisa de Chrome/Edge + rede.
+Nada de setup_outro_pc.bat.
+
+
+--------------------------------------------------------------------------------
+OPÇÃO 5 — Script de verificação
+--------------------------------------------------------------------------------
+Duplo clique em:
+  verificar_python.bat
+
+Ele diz se o Python está OK ou o que falta.
+
+
+--------------------------------------------------------------------------------
+ERROS COMUNS
+--------------------------------------------------------------------------------
+"python nao e reconhecido"
+  → Python nao esta no PATH. Reinstale marcando Add to PATH,
+    ou use PYTHON_EXE com caminho completo.
+
+"python -m venv falhou"
+  → Pacote embeddable sem venv. Prefira WinPython completo
+    ou instalacao normal da TI.
+
+"pip nao encontrado"
+  → Use: python -m ensurepip
+    Depois: python -m pip install -r requirements.txt
+
+Rede/proxy Alcoa bloqueando pip
+  → Peça à TI liberar pypi.org OU instale com wheel offline
+    (copie a pasta venv pronta de outro PC Windows 64-bit igual).
+
+
+--------------------------------------------------------------------------------
+ATALHO: copiar venv de um PC para outro?
+--------------------------------------------------------------------------------
+Em teoria sim (mesmo Windows 64-bit), mas costuma quebrar.
+Preferivel sempre:
+  1. Ter python.exe no PC destino
+  2. Rodar setup_outro_pc.bat de novo
+
+================================================================================
