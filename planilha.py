@@ -173,6 +173,21 @@ def resolver_fornecedor_por_codigo(codigo: str) -> dict[str, str] | None:
     return None
 
 
+def resolver_fornecedor_por_nome(nome: str) -> dict[str, str] | None:
+    """Resolve o código Alcoa a partir do nome do fornecedor na FUP."""
+    alvo = _normalizar_texto(nome).casefold()
+    if not alvo:
+        return None
+
+    for chave, cadastrado in carregar_mapa_codigos_manual().items():
+        if _normalizar_texto(cadastrado).casefold() == alvo:
+            return {
+                "codigo_fornecedor": _normalizar_codigo_fornecedor(chave),
+                "fornecedor": _normalizar_texto(cadastrado),
+            }
+    return None
+
+
 def buscar_linhas_do_codigo(codigo: str) -> list[dict[str, Any]]:
     info = resolver_fornecedor_por_codigo(codigo)
     if not info:
@@ -187,7 +202,23 @@ def buscar_linhas_do_codigo(codigo: str) -> list[dict[str, Any]]:
         if r.get("codigo_fornecedor")
         and mesmo_codigo_fornecedor(r["codigo_fornecedor"], codigo_norm)
     ]
-    return com_codigo if com_codigo else linhas
+    return _deduplicar_por_po_linha(com_codigo if com_codigo else linhas)
+
+
+def _deduplicar_por_po_linha(linhas: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove linhas repetidas da FUP (mesmo PO + linha). Mantém a primeira ocorrência."""
+    vistos: set[tuple[str, str]] = set()
+    unicas: list[dict[str, Any]] = []
+    for registro in linhas:
+        chave = (
+            str(registro.get("numero_po_com_release", "")).strip().lower(),
+            str(registro.get("numero_linha", "")).strip().lower(),
+        )
+        if not chave[0] or chave in vistos:
+            continue
+        vistos.add(chave)
+        unicas.append(registro)
+    return unicas
 
 
 def buscar_respostas_do_codigo(codigo: str, nome_fornecedor: str = "") -> list[dict[str, Any]]:
@@ -315,11 +346,13 @@ def buscar_por_po(numero_po: str) -> list[dict[str, Any]]:
     if not termo:
         return []
 
-    return [
-        r
-        for r in carregar_base_fup()
-        if termo in r["numero_po_com_release"].lower()
-    ]
+    return _deduplicar_por_po_linha(
+        [
+            r
+            for r in carregar_base_fup()
+            if termo in r["numero_po_com_release"].lower()
+        ]
+    )
 
 
 def buscar_por_po_e_linha(numero_po: str, numero_linha: str) -> list[dict[str, Any]]:
@@ -334,13 +367,15 @@ def buscar_por_po_e_linha(numero_po: str, numero_linha: str) -> list[dict[str, A
         if r["numero_po_com_release"].lower() == po and r["numero_linha"] == linha
     ]
     if exatos:
-        return exatos
+        return _deduplicar_por_po_linha(exatos)
 
-    return [
-        r
-        for r in carregar_base_fup()
-        if po in r["numero_po_com_release"].lower() and r["numero_linha"] == linha
-    ]
+    return _deduplicar_por_po_linha(
+        [
+            r
+            for r in carregar_base_fup()
+            if po in r["numero_po_com_release"].lower() and r["numero_linha"] == linha
+        ]
+    )
 
 
 def rotulo_linha(registro: dict[str, Any]) -> str:

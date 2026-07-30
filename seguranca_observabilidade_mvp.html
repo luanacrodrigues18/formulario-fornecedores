@@ -104,10 +104,10 @@ flowchart TB
 
         subgraph seguranca_mvp [Segurança]
             SM1[Login por ID - isolamento por empresa]
-            SM2[Dashboard: usuário + senha]
+            SM2[Dashboard: URL interna / VPN]
             SM3[Secrets / .env fora do Git]
             SM4[HTTPS - Streamlit Cloud]
-            SM5[FUP e JSON fora do repositório]
+            SM5[FUP e JSON no Storage / fora do Git]
             SM6[Bloqueio PO + linha duplicada]
         end
 
@@ -143,7 +143,7 @@ flowchart TB
     end
 
     F -->|ID| FORM
-    E -->|usuário + senha| DASH
+    E -->|URL interna| DASH
 
     seguranca_mvp --> FORM
     seguranca_mvp --> DASH
@@ -169,7 +169,7 @@ flowchart TB
      ▼                                    ▼
 ┌─────────────┐                   ┌─────────────┐
 │  SEGURANÇA  │                   │  SEGURANÇA  │
-│  ID único   │                   │ user+senha  │
+│  ID único   │                   │ equipe int. │
 │  só seus    │                   │ só interno  │
 │  pedidos    │                   │             │
 └──────┬──────┘                   └──────┬──────┘
@@ -199,9 +199,9 @@ flowchart TB
         </thead>
         <tbody>
           <tr><td>Login por ID do fornecedor</td><td>codigo_fornecedor em cada envio</td></tr>
-          <tr><td>Dashboard com usuário e senha</td><td>Timestamps de início e fim</td></tr>
+          <tr><td>Dashboard URL interna (não pública)</td><td>Timestamps de início e fim</td></tr>
           <tr><td>Secrets fora do Git</td><td>Dashboard com métricas e filtros</td></tr>
-          <tr><td>FUP e JSON fora do GitHub</td><td>Export Excel para análise</td></tr>
+          <tr><td>FUP e JSON fora do GitHub / Storage</td><td>Export Excel + retorno FUP</td></tr>
           <tr><td>HTTPS na nuvem</td><td>Table Editor no Supabase</td></tr>
           <tr><td>1 envio por PO + linha</td><td>Mensagens de erro no app</td></tr>
         </tbody>
@@ -217,7 +217,7 @@ flowchart TB
         <tbody>
           <tr>
             <td><strong>Produção básica</strong></td>
-            <td>Hash de senha, IDs fixos, RLS revisada</td>
+            <td>VPN/SSO no dash, IDs fixos, RLS revisada</td>
             <td>Backup automático, domínio próprio</td>
           </tr>
           <tr>

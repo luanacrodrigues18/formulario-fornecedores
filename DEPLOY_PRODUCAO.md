@@ -12,7 +12,7 @@ Este sistema tem **5 peças** que podem ser hospedadas de formas diferentes:
 
 | Peça | Tecnologia atual | Função |
 |---|---|---|
-| **Formulário público** | `app.py` + `auth_fornecedor.py` | Login por ID + envio do fornecedor |
+| **Formulário público** | `app.py` + `auth_fornecedor.py` | Cadastro/login (usuário + senha) + envio |
 | **Dashboard interno** | `dashboard.py` (Streamlit) | Uso da equipe Alcoa |
 | **Banco de respostas** | Supabase (PostgreSQL) | Armazena envios (`formulario`) |
 | **Cadastro de IDs** | `fornecedores_codigos.json` | Mapa `ID → nome` (passo 1) |
@@ -342,7 +342,9 @@ Integração futura para enviar respostas ao ERP — não substitui o formulári
 A FUP **não tem coluna de código**. O MVP usa um arquivo separado:
 
 ```
-ID (login) → fornecedores_codigos.json → Nome = coluna FORNECEDOR da FUP
+ID / código Alcoa → fornecedores_codigos.json → Nome = coluna FORNECEDOR da FUP
+                         ↓
+              contas_fornecedor (usuário + senha em hash)
 ```
 
 | Estratégia | Como funciona | Quando usar |
@@ -372,22 +374,31 @@ CREATE TABLE IF NOT EXISTS fornecedores (
 
 ## 12. Segurança do dashboard e do formulário em produção
 
-O **formulário** é público, mas exige **login por ID do fornecedor** (isolamento por empresa).  
+O **formulário** é público, mas exige **cadastro/login** (usuário + senha vinculados ao código Alcoa).
+
+| Camada | Onde | Status |
+|--------|------|--------|
+| **Usuário + senha** (hash, bloqueio, rotação) | Formulário | Feito |
+| **Código Alcoa** (isolamento por empresa) | `fornecedores_codigos.json` | Feito |
+| **RLS fechado + service_role** | Supabase | Feito (`sql/fechar_rls.sql`) |
+| **streamlit-authenticator** | Dashboard (opcional) | Baixo esforço |
+
+**Observação:** o código Alcoa ainda é um segredo compartilhado da empresa. Evolua para CNPJ/SSO quando o processo for crítico. Não divulgue a URL do dashboard publicamente.
+
 O **dashboard** não deve ser público.
 
 | Mecanismo | Onde usar | Esforço |
 |---|---|---|
-| **Login por ID** (já no MVP) | Formulário — só pedidos daquela empresa | Feito |
+| **Usuário + senha + código Alcoa** | Formulário — só pedidos daquela empresa | Feito |
+| **RLS fechado + service_role** | Supabase | Feito |
 | **VPN corporativa** | Dashboard só na rede interna | Baixo (infra) |
 | **Azure AD / SSO** | App Service Easy Auth, proxy OAuth | Médio |
-| **streamlit-authenticator** | Usuário/senha simples no `dashboard.py` | Baixo |
+| **streamlit-authenticator** | Usuário/senha no `dashboard.py` | Baixo |
 | **IP allowlist** | Firewall só IPs da Alcoa | Baixo |
 
 **Mínimo aceitável em produção:**  
-- Formulário: login por ID + coluna `codigo_fornecedor` no banco  
-- Dashboard: autenticação corporativa **ou** VPN  
-
-**Observação de segurança do MVP:** o ID funciona como “senha compartilhada”. Evolua para e-mail + token ou SSO quando o processo for crítico.
+- Formulário: cadastro/login + `codigo_fornecedor` no banco + RLS fechado  
+- Dashboard: restringir URL / VPN / SSO (MVP atual: acesso interno; não divulgar URL)
 
 ---
 
@@ -571,14 +582,12 @@ API intermediária
 ## 20. Próximos passos sugeridos
 
 ### Fase 1 — Estabilizar o MVP (agora)
-- [x] Login por ID do fornecedor (`auth_fornecedor.py`)
+- [x] Cadastro/login com usuário + senha (`auth_fornecedor.py`, `contas_fornecedor.py`)
 - [x] Cadastro `fornecedores_codigos.json` gerado da FUP
-- [ ] Coluna `codigo_fornecedor` no Supabase (se ainda não rodou o SQL)
-- [ ] Login na nuvem (tabela `fornecedores` ou JSON no deploy)
-- [ ] Supabase Pro ou revisão de RLS
-- [ ] Índice único `PO + linha` no banco
+- [x] Tabelas `contas_fornecedor` / `acessos_log` + RLS fechado (`sql/fechar_rls.sql`)
+- [x] App com `SUPABASE_SERVICE_ROLE_KEY`
 - [ ] Domínio amigável (mesmo no Streamlit)
-- [ ] Proteger dashboard (senha ou VPN)
+- [ ] Proteger dashboard (VPN / SSO; não divulgar URL)
 
 ### Fase 2 — Produção controlada (1–3 meses)
 - [ ] Dockerizar `app.py` e `dashboard.py`

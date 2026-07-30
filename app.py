@@ -20,7 +20,7 @@ from alcoano import (
     help_campo,
     render_dicas_formulario,
     render_faq,
-    render_mensagem_passo,
+    render_mensagem_pagina,
     render_mensagem_sucesso,
 )
 from planilha import (
@@ -30,7 +30,6 @@ from planilha import (
     garantir_arquivo_codigos,
     garantir_arquivo_fup,
     listar_fornecedores,
-    rotulo_linha,
 )
 import planilha as planilha_mod
 from auth_fornecedor import (
@@ -54,10 +53,26 @@ st.markdown(
     """
     <style>
         .block-container {
-            padding-top: 2.5rem;
-            padding-left: 2rem;
-            padding-right: 2rem;
-            max-width: 100%;
+            padding-top: 2rem !important;
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
+            /* Mantém lista + formulário lado a lado compactos no zoom 100% */
+            max-width: 1280px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+        }
+        /* Evita as colunas Pedidos|Formulário se desfazerem / se espaçarem demais */
+        div[data-testid="stHorizontalBlock"]:has(.lista-pedidos-marker),
+        div[data-testid="stHorizontalBlock"]:has(.painel-vazio-form),
+        div[data-testid="stHorizontalBlock"]:has(div[data-testid="stForm"]) {
+            gap: 1.25rem !important;
+            flex-wrap: nowrap !important;
+            align-items: flex-start !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(.lista-pedidos-marker) > div[data-testid="column"],
+        div[data-testid="stHorizontalBlock"]:has(.painel-vazio-form) > div[data-testid="column"],
+        div[data-testid="stHorizontalBlock"]:has(div[data-testid="stForm"]) > div[data-testid="column"] {
+            min-width: 0 !important;
         }
         .fornecedor-destaque {
             background: linear-gradient(135deg, #eef4fb 0%, #f8fafc 100%);
@@ -68,37 +83,38 @@ st.markdown(
         }
         .pedido-resumo-h {
             display: flex;
-            gap: 1rem;
-            margin: 0.75rem 0 1.25rem 0;
-            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 0.35rem 0 0.75rem 0;
+            flex-wrap: nowrap;
+            align-items: stretch;
         }
         .pedido-card {
             flex: 1;
-            min-width: 160px;
+            min-width: 0;
             background: linear-gradient(135deg, #eef4fb 0%, #f8fafc 100%);
             border: 1px solid #b8cfe8;
-            border-radius: 12px;
-            padding: 0.85rem 1.1rem;
+            border-radius: 10px;
+            padding: 0.55rem 0.75rem;
         }
         .pedido-card-wide {
-            flex: 2.2;
-            min-width: 260px;
+            flex: 1.6;
+            min-width: 0;
         }
         .pedido-card .label {
             display: block;
-            font-size: 0.76rem;
+            font-size: 0.68rem;
             color: #64748b !important;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.04em;
-            margin-bottom: 0.35rem;
+            margin-bottom: 0.2rem;
         }
         .pedido-card .valor {
             display: block;
-            font-size: 1.15rem;
+            font-size: 0.95rem;
             font-weight: 700;
             color: #1e3a5f !important;
-            line-height: 1.4;
+            line-height: 1.3;
             word-break: break-word;
         }
         section[data-testid="stSidebar"] {
@@ -281,15 +297,16 @@ st.markdown(
             color: #1e3a5f !important;
         }
         .painel-selecao-lateral .pedido-resumo-h {
-            flex-direction: column;
+            flex-direction: row;
+            flex-wrap: nowrap;
             margin-top: 0;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.5rem;
         }
         .painel-selecao-lateral .pedido-card,
         .painel-selecao-lateral .pedido-card-wide {
             min-width: 0;
-            flex: none;
-            width: 100%;
+            flex: 1;
+            width: auto;
         }
         .secao-titulo {
             color: #1e3a5f;
@@ -346,6 +363,20 @@ st.markdown(
             background: #f0fdf4;
             color: #15803d;
         }
+        .painel-vazio-form {
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            border-radius: 14px;
+            padding: 2rem 1.25rem;
+            color: #64748b;
+            text-align: center;
+            margin-top: 0.5rem;
+        }
+        .painel-vazio-form p {
+            margin: 0;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
         .card-pedido {
             background: white;
             border: 1px solid #e2e8f0;
@@ -366,9 +397,10 @@ st.markdown(
         }
         div[data-testid="stForm"] {
             background: #f8fafc !important;
-            padding: 1.5rem;
+            padding: 1rem 1.1rem;
             border-radius: 14px;
             border: 1px solid #e2e8f0;
+            margin-top: 0.25rem;
             color: #0f172a !important;
         }
         div[data-testid="stForm"] label,
@@ -472,41 +504,57 @@ st.markdown(
 def _inicializar_estado() -> None:
     defaults = {
         "hora_inicio": datetime.now().isoformat(),
-        "passo": 1,
         "linha_selecionada": None,
+        "fila_pedidos": [],
         "envio_sucesso": False,
         "ultimo_registro": None,
         "link_processado": False,
+        "_linhas_cache": [],
+        "mostrar_todos": False,
     }
     for chave, valor in defaults.items():
         if chave not in st.session_state:
             st.session_state[chave] = valor
 
 
-def _render_cabecalho_fluxo(passo: int, sucesso: bool = False) -> None:
-    nomes = ["1 · Buscar pedido", "2 · Escolher linha", "3 · Preencher e enviar"]
-    cols = st.columns(3)
-    for idx, (col, nome) in enumerate(zip(cols, nomes), start=1):
-        classe = "step"
-        if sucesso or idx < passo:
-            classe += " done"
-            icone = "✓ "
-        elif idx == passo:
-            classe += " active"
-            icone = "→ "
-        else:
-            icone = ""
-        with col:
-            st.markdown(
-                f'<div class="{classe}">{icone}{nome}</div>',
-                unsafe_allow_html=True,
-            )
+def _chave_pedido(linha: dict) -> tuple[str, str]:
+    return (
+        str(linha.get("numero_po_com_release", "")).strip(),
+        str(linha.get("numero_linha", "")).strip(),
+    )
 
+
+def _dataframe_pedidos(linhas: list[dict]) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "PO com Release": linha.get("numero_po_com_release", ""),
+                "Linha": linha.get("numero_linha", ""),
+                "Item": str(linha.get("descricao_item", "") or "")[:90],
+            }
+            for linha in linhas
+        ]
+    )
+
+
+def _avancar_fila_ou_resetar() -> None:
+    fila = list(st.session_state.get("fila_pedidos") or [])
+    if fila:
+        st.session_state.linha_selecionada = fila.pop(0)
+        st.session_state.fila_pedidos = fila
+        st.session_state.envio_sucesso = False
+        st.session_state.ultimo_registro = None
+        st.session_state.hora_inicio = datetime.now().isoformat()
+    else:
+        _resetar_fluxo()
+
+
+def _render_cabecalho_pagina(sucesso: bool = False) -> None:
     st.markdown('<div class="alcoano-fluxo">', unsafe_allow_html=True)
     if sucesso:
         render_mensagem_sucesso()
     else:
-        render_mensagem_passo(passo)
+        render_mensagem_pagina()
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -524,6 +572,21 @@ def _filtrar_linhas(linhas: list[dict], termo: str) -> list[dict]:
     ]
 
 
+def _sincronizar_selecao(pedidos_marcados: list[dict]) -> None:
+    """Atualiza pedido ativo e fila a partir da seleção da tabela."""
+    if not pedidos_marcados:
+        return
+    atual = st.session_state.get("linha_selecionada")
+    novas_chaves = {_chave_pedido(p) for p in pedidos_marcados}
+    if atual and _chave_pedido(atual) in novas_chaves:
+        resto = [p for p in pedidos_marcados if _chave_pedido(p) != _chave_pedido(atual)]
+        st.session_state.fila_pedidos = resto
+    else:
+        st.session_state.linha_selecionada = pedidos_marcados[0]
+        st.session_state.fila_pedidos = pedidos_marcados[1:]
+        st.session_state.hora_inicio = datetime.now().isoformat()
+
+
 def _render_resumo_pedido(linha: dict, rotulo_po: str = "PO com Release") -> None:
     po = html.escape(str(linha["numero_po_com_release"]))
     linha_num = html.escape(str(linha["numero_linha"]))
@@ -532,16 +595,16 @@ def _render_resumo_pedido(linha: dict, rotulo_po: str = "PO com Release") -> Non
         f"""
         <div class="pedido-resumo-h">
             <div class="pedido-card">
-                <span class="label" style="color:#64748b !important;">{html.escape(rotulo_po)}</span>
-                <span class="valor" style="color:#1e3a5f !important;">{po}</span>
+                <span class="label">{html.escape(rotulo_po)}</span>
+                <span class="valor">{po}</span>
             </div>
-            <div class="pedido-card">
-                <span class="label" style="color:#64748b !important;">Linha</span>
-                <span class="valor" style="color:#1e3a5f !important;">{linha_num}</span>
+            <div class="pedido-card" style="flex:0.55">
+                <span class="label">Linha</span>
+                <span class="valor">{linha_num}</span>
             </div>
             <div class="pedido-card pedido-card-wide">
-                <span class="label" style="color:#64748b !important;">Fornecedor</span>
-                <span class="valor" style="color:#1e3a5f !important;">{fornecedor}</span>
+                <span class="label">Fornecedor</span>
+                <span class="valor" style="font-size:0.82rem">{fornecedor}</span>
             </div>
         </div>
         """,
@@ -564,22 +627,11 @@ def _render_sidebar() -> None:
             unsafe_allow_html=True,
         )
 
-        st.markdown('<p class="sidebar-nav-label">Navegação</p>', unsafe_allow_html=True)
-        secao = st.radio(
-            "Menu",
-            ["💡 Dicas", "❓ FAQ"],
-            label_visibility="collapsed",
-            key="sidebar_menu",
-        )
+        render_dicas_formulario()
+        render_faq()
 
         st.divider()
-
         render_resumo_sessao_sidebar()
-
-        if secao.startswith("💡"):
-            render_dicas_formulario()
-        else:
-            render_faq()
 
 
 def _formatar_valor_detalhe(campo: str, valor) -> str:
@@ -610,12 +662,14 @@ def _tabela_detalhes_envio(registro: dict) -> pd.DataFrame:
 
 
 def _resetar_fluxo() -> None:
-    st.session_state.passo = 1
     st.session_state.linha_selecionada = None
+    st.session_state.fila_pedidos = []
     st.session_state.envio_sucesso = False
     st.session_state.ultimo_registro = None
     st.session_state.hora_inicio = datetime.now().isoformat()
     st.session_state.link_processado = False
+    st.session_state._linhas_cache = []
+    st.session_state.mostrar_todos = False
 
 
 def _aplicar_link_direto() -> None:
@@ -632,10 +686,11 @@ def _aplicar_link_direto() -> None:
 
     if len(linhas) == 1:
         st.session_state.linha_selecionada = linhas[0]
-        st.session_state.passo = 3
+        st.session_state._linhas_cache = linhas
+        st.session_state.mostrar_todos = False
     elif len(linhas) > 1:
         st.session_state._linhas_cache = linhas
-        st.session_state.passo = 2
+        st.session_state.mostrar_todos = False
     else:
         st.session_state._link_invalido = (po_link, linha_link)
 
@@ -693,6 +748,13 @@ if not planilha_mod.ARQUIVO_CODIGOS.is_file():
     )
     st.stop()
 
+try:
+    from contas_fornecedor import garantir_arquivo_contas
+
+    garantir_arquivo_contas()
+except Exception:
+    pass
+
 if not autenticado():
     _render_sidebar()
     render_tela_login()
@@ -709,8 +771,7 @@ if st.session_state.get("_link_invalido"):
     del st.session_state._link_invalido
 
 if (
-    st.session_state.passo == 3
-    and st.session_state.linha_selecionada
+    st.session_state.linha_selecionada
     and st.query_params.get("po")
     and st.query_params.get("linha")
 ):
@@ -725,7 +786,7 @@ _render_sidebar()
 
 if _sucesso:
     reg = st.session_state.ultimo_registro
-    _render_cabecalho_fluxo(3, sucesso=True)
+    _render_cabecalho_pagina(sucesso=True)
     st.markdown(
         """
         <div class="sucesso-box">
@@ -753,164 +814,169 @@ if _sucesso:
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if st.button("➕ Enviar nova resposta", type="primary", use_container_width=True):
-        _resetar_fluxo()
-        st.rerun()
+    fila_restante = list(st.session_state.get("fila_pedidos") or [])
+    if fila_restante:
+        st.info(
+            f"Ainda há **{len(fila_restante)}** pedido(s) selecionado(s) para preencher."
+        )
+        if st.button(
+            f"➡️ Preencher próximo pedido ({fila_restante[0].get('numero_po_com_release')} · linha {fila_restante[0].get('numero_linha')})",
+            type="primary",
+            use_container_width=True,
+        ):
+            _avancar_fila_ou_resetar()
+            st.rerun()
+        if st.button("🏠 Voltar à busca", use_container_width=True):
+            _resetar_fluxo()
+            st.rerun()
+    else:
+        if st.button("➕ Enviar outra resposta", type="primary", use_container_width=True):
+            _resetar_fluxo()
+            st.rerun()
     st.stop()
 
-_render_cabecalho_fluxo(st.session_state.passo)
+_render_cabecalho_pagina()
 
-with st.container():
+st.markdown(f"### 👋 Olá, **{fornecedor_atual()}**")
+st.caption(f"Código do fornecedor: **{codigo_atual()}**")
 
-    # ── PASSO 1: Busca ──────────────────────────────────────────────────────
-    if st.session_state.passo == 1:
-        st.markdown(f"### 👋 Olá, **{fornecedor_atual()}**")
-        st.caption(f"Código do fornecedor: **{codigo_atual()}**")
+minhas_linhas = linhas_do_fornecedor_logado()
+st.info(f"Você tem **{len(minhas_linhas)}** pedido(s) vinculado(s) ao seu código.")
 
-        minhas_linhas = linhas_do_fornecedor_logado()
-        st.info(f"Você tem **{len(minhas_linhas)}** pedido(s) vinculado(s) ao seu código.")
+busca_cols = st.columns([4, 1], gap="small")
+with busca_cols[0]:
+    numero_po_busca = st.text_input(
+        "📄 Buscar por PO com Release",
+        placeholder="Ex: 4133600-23",
+        help=help_campo("po"),
+        key="busca_po_unica",
+    )
+with busca_cols[1]:
+    st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
+    if st.button("📦 Ver todos", use_container_width=True, key="btn_ver_todos"):
+        st.session_state.mostrar_todos = True
+        st.session_state._linhas_cache = minhas_linhas
 
-        st.markdown('<div class="busca-horizontal">', unsafe_allow_html=True)
-        numero_po_busca = st.text_input(
-            "📄 Buscar por PO com Release",
-            placeholder="Ex: 4133600-23",
-            help=help_campo("po"),
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
+termo_po = (numero_po_busca or "").strip().lower()
+if termo_po:
+    linhas_disponiveis = [
+        linha
+        for linha in minhas_linhas
+        if termo_po in linha["numero_po_com_release"].lower()
+    ]
+    st.session_state._linhas_cache = linhas_disponiveis
+elif st.session_state.get("mostrar_todos"):
+    linhas_disponiveis = filtrar_linhas_do_fornecedor(
+        st.session_state.get("_linhas_cache") or minhas_linhas
+    )
+elif st.session_state.get("_linhas_cache"):
+    linhas_disponiveis = filtrar_linhas_do_fornecedor(st.session_state._linhas_cache)
+else:
+    linhas_disponiveis = []
 
-        linhas_disponiveis: list[dict] = []
-        termo_po = numero_po_busca.strip().lower()
-        if termo_po:
-            linhas_disponiveis = [
-                linha
-                for linha in minhas_linhas
-                if termo_po in linha["numero_po_com_release"].lower()
-            ]
-        elif st.button("📦 Ver todos os meus pedidos", type="primary", use_container_width=True):
-            st.session_state._linhas_cache = minhas_linhas
-            st.session_state.passo = 2
-            st.rerun()
+if termo_po and not linhas_disponiveis:
+    st.warning("Nenhum pedido seu encontrado com esse PO. Verifique o código digitado.")
 
-        if linhas_disponiveis:
-            st.session_state.passo = 2
-            st.session_state._linhas_cache = linhas_disponiveis
-            st.rerun()
-        elif termo_po:
-            st.warning("Nenhum pedido seu encontrado com esse PO. Verifique o código digitado.")
+col_lista, col_form = st.columns([1, 1], gap="medium")
 
-    # ── PASSO 2: Escolher linha ─────────────────────────────────────────────
-    elif st.session_state.passo == 2:
-        linhas_disponiveis = filtrar_linhas_do_fornecedor(
-            st.session_state.get("_linhas_cache", [])
-        )
-
-        st.markdown("### 📦 Selecione a linha do pedido")
+with col_lista:
+    st.markdown('<div class="lista-pedidos-marker"></div>', unsafe_allow_html=True)
+    st.markdown("### 📦 Pedidos")
+    if not linhas_disponiveis:
+        st.caption("Digite um PO ou clique em **Ver todos** para listar seus pedidos.")
+    else:
         st.markdown(
             f'<span class="badge">{len(linhas_disponiveis)} resultado(s)</span>',
             unsafe_allow_html=True,
         )
+        st.caption("Marque um ou mais pedidos. O formulário à direita acompanha a seleção.")
 
-        if len(linhas_disponiveis) > 3:
+        if len(linhas_disponiveis) > 5:
             filtro = st.text_input(
-                "🔎 Refinar busca",
-                placeholder="Filtrar por PO, linha ou descrição do item...",
+                "🔎 Refinar",
+                placeholder="PO, linha ou item...",
+                key="filtro_lista_unica",
             )
             linhas_disponiveis = _filtrar_linhas(linhas_disponiveis, filtro)
 
-        col_lista, col_detalhe = st.columns([3, 2], gap="large")
+        if not linhas_disponiveis:
+            st.warning("Nenhum resultado com esse filtro.")
+        else:
+            df_pedidos = _dataframe_pedidos(linhas_disponiveis)
+            selecao = st.dataframe(
+                df_pedidos,
+                use_container_width=True,
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="multi-row",
+                key="tabela_selecao_pedidos",
+                height=min(520, 48 + 36 * max(len(df_pedidos), 1)),
+                column_config={
+                    "PO com Release": st.column_config.TextColumn("PO com Release", width="medium"),
+                    "Linha": st.column_config.TextColumn("Linha", width="small"),
+                    "Item": st.column_config.TextColumn("Item", width="large"),
+                },
+            )
+            indices = list(selecao.selection.rows) if selecao and selecao.selection else []
+            pedidos_marcados = [
+                linhas_disponiveis[i] for i in indices if 0 <= i < len(linhas_disponiveis)
+            ]
+            if pedidos_marcados:
+                _sincronizar_selecao(pedidos_marcados)
+                st.success(f"**{len(pedidos_marcados)}** selecionado(s).")
+            elif not st.session_state.get("linha_selecionada"):
+                st.info("Clique na(s) linha(s) da lista para preencher.")
 
-        with col_lista:
-            if len(linhas_disponiveis) == 1:
-                st.session_state.linha_selecionada = linhas_disponiveis[0]
-                st.success("Pedido identificado automaticamente.")
-            elif linhas_disponiveis:
-                opcoes = {rotulo_linha(linha): linha for linha in linhas_disponiveis}
-                st.markdown('<div class="lista-pedidos-marker"></div>', unsafe_allow_html=True)
-                st.caption("Clique no pedido correto:")
-                escolha = st.radio(
-                    "Pedidos",
-                    list(opcoes.keys()),
-                    label_visibility="collapsed",
-                )
-                st.session_state.linha_selecionada = opcoes[escolha]
-            else:
-                st.session_state.linha_selecionada = None
-                st.warning("Nenhum resultado com esse filtro.")
+with col_form:
+    st.markdown("### ✍️ Formulário")
+    linha = st.session_state.get("linha_selecionada")
 
-        with col_detalhe:
-            if st.session_state.linha_selecionada:
-                linha = st.session_state.linha_selecionada
-                st.markdown('<div class="painel-selecao-lateral">', unsafe_allow_html=True)
-                st.markdown(
-                    '<p class="painel-selecao-titulo">📌 Pedido selecionado</p>',
-                    unsafe_allow_html=True,
-                )
-                _render_resumo_pedido(linha)
-
-                if linha.get("descricao_item"):
-                    st.caption(f"📦 {linha['descricao_item']}")
-
-                col_voltar, col_avancar = st.columns(2)
-                with col_voltar:
-                    if st.button("← Voltar", use_container_width=True, key="voltar_passo2"):
-                        st.session_state.passo = 1
-                        st.session_state.linha_selecionada = None
-                        st.rerun()
-                with col_avancar:
-                    if st.button(
-                        "Continuar →",
-                        type="primary",
-                        use_container_width=True,
-                        key="avancar_passo2",
-                    ):
-                        st.session_state.passo = 3
-                        st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
-            elif not linhas_disponiveis:
-                st.markdown('<div class="painel-selecao-lateral">', unsafe_allow_html=True)
-                st.info("Ajuste o filtro ou volte para fazer uma nova busca.")
-                if st.button("← Voltar à busca", use_container_width=True, key="voltar_busca_vazio"):
-                    st.session_state.passo = 1
-                    st.session_state.linha_selecionada = None
-                    st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
-
-    # ── PASSO 3: Formulário ─────────────────────────────────────────────────
-    elif st.session_state.passo == 3 and st.session_state.linha_selecionada:
-        linha = st.session_state.linha_selecionada
+    if not linha:
+        st.markdown(
+            """
+            <div class="painel-vazio-form">
+                <p>Selecione um pedido na lista à esquerda para preencher o retorno.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
         permitidas = {
             (item["numero_po_com_release"], item["numero_linha"])
             for item in linhas_do_fornecedor_logado()
         }
         if (linha["numero_po_com_release"], linha["numero_linha"]) not in permitidas:
             st.error("Este pedido não pertence ao seu código de fornecedor.")
-            if st.button("← Voltar", type="primary", use_container_width=True):
-                _resetar_fluxo()
+            if st.button("Limpar seleção", type="primary", use_container_width=True):
+                st.session_state.linha_selecionada = None
+                st.session_state.fila_pedidos = []
                 st.rerun()
-            st.stop()
-
-        resposta_anterior = buscar_resposta_por_po_linha(
-            linha["numero_po_com_release"],
-            linha["numero_linha"],
-        )
-        if resposta_anterior:
-            st.error(
-                f"Este pedido já possui resposta registrada "
-                f"(ID {resposta_anterior.get('id', '—')}, "
-                f"enviada em {formatar_datetime(resposta_anterior.get('hora_conclusao'))}). "
-                "Não é possível enviar novamente para o mesmo PO e linha."
+        else:
+            resposta_anterior = buscar_resposta_por_po_linha(
+                linha["numero_po_com_release"],
+                linha["numero_linha"],
             )
-            if st.button("← Voltar à busca", type="primary", use_container_width=True):
-                _resetar_fluxo()
-                st.rerun()
-            st.stop()
+            fila = list(st.session_state.get("fila_pedidos") or [])
+            if fila:
+                st.caption(
+                    f"Preenchendo **1 de {len(fila) + 1}** · restam {len(fila)} depois deste."
+                )
 
-        st.markdown("### ✍️ Complete suas informações")
-        _render_resumo_pedido(linha, rotulo_po="PO")
+            if resposta_anterior:
+                st.warning(
+                    f"Já existe resposta para este PO/linha "
+                    f"(protocolo #{resposta_anterior.get('id', '—')}, "
+                    f"em {formatar_datetime(resposta_anterior.get('hora_conclusao'))}). "
+                    "Você pode enviar novamente — um novo registro será criado."
+                )
 
-        with st.form("formulario_fornecedor", clear_on_submit=True):
-            col_contato, col_entrega, col_extra = st.columns(3)
-            with col_contato:
+            _render_resumo_pedido(linha, rotulo_po="PO")
+
+            form_key = (
+                f"form_{linha['numero_po_com_release']}_{linha['numero_linha']}_"
+                f"{st.session_state.hora_inicio}"
+            )
+            with st.form(form_key, clear_on_submit=True):
                 st.markdown("**Contato**")
                 email = st.text_input(
                     f"📧 {COLUNAS_EXIBICAO['email']} *",
@@ -923,7 +989,6 @@ with st.container():
                     value=linha.get("fornecedor", ""),
                     help=help_campo("nome"),
                 )
-            with col_entrega:
                 st.markdown("**Entrega**")
                 data_promessa = st.date_input(
                     f"📅 {COLUNAS_EXIBICAO['data_promessa']} *",
@@ -936,61 +1001,54 @@ with st.container():
                     placeholder="Ex: 5862",
                     help=help_campo("numero_nf"),
                 )
-            with col_extra:
                 st.markdown("**Coleta**")
                 observacoes = st.text_area(
                     f"📝 {COLUNAS_EXIBICAO['observacoes_coleta']}",
                     value=linha.get("observacoes_base", ""),
-                    height=148,
+                    height=120,
                     help=help_campo("observacoes_coleta"),
                 )
 
-            col_voltar, col_enviar = st.columns([1, 2])
-            with col_voltar:
-                voltar = st.form_submit_button("← Voltar", use_container_width=True)
-            with col_enviar:
-                enviar = st.form_submit_button(
-                    "✅ Enviar resposta",
-                    type="primary",
-                    use_container_width=True,
-                )
+                col_limpar, col_enviar = st.columns([1, 2])
+                with col_limpar:
+                    limpar = st.form_submit_button("Limpar", use_container_width=True)
+                with col_enviar:
+                    enviar = st.form_submit_button(
+                        "✅ Enviar resposta",
+                        type="primary",
+                        use_container_width=True,
+                    )
 
-        if voltar:
-            st.session_state.passo = 2
-            st.rerun()
+            if limpar:
+                st.session_state.linha_selecionada = None
+                st.session_state.fila_pedidos = []
+                st.rerun()
 
-        if enviar:
-            dados = {
-                "hora_inicio": st.session_state.hora_inicio,
-                "hora_conclusao": datetime.now().isoformat(),
-                "email": email.strip(),
-                "nome": nome.strip(),
-                "codigo_fornecedor": codigo_atual(),
-                "numero_po_com_release": linha["numero_po_com_release"],
-                "data_promessa": data_promessa.isoformat(),
-                "observacoes_coleta": observacoes.strip(),
-                "numero_nf": numero_nf.strip(),
-                "numero_linha": linha["numero_linha"],
-                "indice_base": linha["indice_base"],
-            }
+            if enviar:
+                dados = {
+                    "hora_inicio": st.session_state.hora_inicio,
+                    "hora_conclusao": datetime.now().isoformat(),
+                    "email": email.strip(),
+                    "nome": nome.strip(),
+                    "codigo_fornecedor": codigo_atual(),
+                    "numero_po_com_release": linha["numero_po_com_release"],
+                    "data_promessa": data_promessa.isoformat(),
+                    "observacoes_coleta": observacoes.strip(),
+                    "numero_nf": numero_nf.strip(),
+                    "numero_linha": linha["numero_linha"],
+                    "indice_base": linha["indice_base"],
+                }
 
-            erros = validar_registro(dados)
-            if buscar_resposta_por_po_linha(
-                linha["numero_po_com_release"], linha["numero_linha"]
-            ):
-                st.error(
-                    "Já existe uma resposta para este PO e linha. "
-                    "Atualize a página ou entre em contato com a equipe Alcoa."
-                )
-            elif erros:
-                for erro in erros:
-                    st.error(erro)
-            else:
-                try:
-                    registro = salvar_registro(dados)
-                    st.session_state.ultimo_registro = registro
-                    st.session_state.envio_sucesso = True
-                    st.balloons()
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"Erro ao salvar: {exc}")
+                erros = validar_registro(dados)
+                if erros:
+                    for erro in erros:
+                        st.error(erro)
+                else:
+                    try:
+                        registro = salvar_registro(dados)
+                        st.session_state.ultimo_registro = registro
+                        st.session_state.envio_sucesso = True
+                        st.balloons()
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Erro ao salvar: {exc}")

@@ -33,12 +33,16 @@ JEITO B — NO COMPUTADOR (se precisar rodar local)
 ========================================================================
 
 PASSO 1 — Python no PC
-  Dê duplo clique em:  verificar_python.bat
+  Se NAO tiver Python:
+    Duplo clique em:  instalar_python.bat
+    Depois FECHE e ABRA de novo o Explorer.
+    Depois: verificar_python.bat
+
+  Se JA tiver Python:
+    Duplo clique em:  verificar_python.bat
 
   - Se aparecer [OK] em tudo → vá para o PASSO 2
-  - Se aparecer [FALHOU] → peça à TI:
-      "Preciso do Python 3.12 instalado, com Add to PATH"
-    Depois rode de novo o verificar_python.bat
+  - Se aparecer [FALHOU] → peça à TI o Python 3.12, ou use só pelos links da nuvem
 
 
 PASSO 2 — Preparar a pasta (só na primeira vez)
@@ -70,6 +74,16 @@ SE FOR USAR A PASTA DA REDE ALCOA
 4. Lá, duplo clique:  INICIAR.bat
 
 NÃO tente rodar direto pelo caminho que começa com \\noa.alcoa.com\...
+
+
+------------------------------------------------------------------------
+COMO O FORNECEDOR ENTRA (nuvem ou local)
+------------------------------------------------------------------------
+  1. Cadastro: cria USUÁRIO + SENHA e informa o CÓDIGO Alcoa da empresa
+  2. Login: entra com o usuário (ou o código) + senha
+  3. Busca pedidos, preenche e envia
+
+  Redefinir senha exige a senha atual.
 
 
 ------------------------------------------------------------------------

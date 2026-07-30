@@ -47,7 +47,8 @@ Copie da pasta do projeto (GitHub / seu PC) para a pasta da rede:
   Dados (NÃO vão no Git — coloque na pasta local ou na rede com cuidado):
     .env                         (copiar de .env.example e preencher)
     relatorio_fup.xlsm           (planilha FUP)
-    fornecedores_codigos.json    (códigos de login)
+    fornecedores_codigos.json    (códigos Alcoa → nome; login/cadastro)
+    (contas ficam no Supabase: contas_fornecedor)
 
   Opcional:
     README.md, GUIA_IMPLANTACAO.md, APRESENTACAO.html

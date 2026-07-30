@@ -9,21 +9,32 @@ Opções, da mais simples à mais "sem instalação de sistema":
 
 
 --------------------------------------------------------------------------------
-OPÇÃO 1 — Pedir à TI (melhor para corporativo)
+OPÇÃO 1 — Duplo clique (mais fácil)
+--------------------------------------------------------------------------------
+1. Duplo clique em:  instalar_python.bat
+2. Aguarde o download e a instalação
+3. FECHE e ABRA de novo o Explorer / qualquer Prompt
+4. Duplo clique em:  verificar_python.bat
+5. Se OK:  setup_outro_pc.bat  ou  INICIAR.bat opção 3
+
+O instalar_python.bat usa o instalador oficial Python 3.12 (usuário, sem admin).
+Nao instala dentro da pasta do projeto — instala no Windows do usuario.
+
+
+--------------------------------------------------------------------------------
+OPÇÃO 2 — Pedir à TI (melhor para corporativo fechado)
 --------------------------------------------------------------------------------
 Solicite instalação de:
   - Python 3.11 ou 3.12 (64-bit)
   - Com "Add python.exe to PATH" marcado
 
-Depois, no Prompt:
+Depois:
   python --version
-
-Se aparecer Python 3.11+ , rode:
   setup_outro_pc.bat
 
 
 --------------------------------------------------------------------------------
-OPÇÃO 2 — Microsoft Store (se liberada)
+OPÇÃO 3 — Microsoft Store (se liberada)
 --------------------------------------------------------------------------------
 1. Abra Microsoft Store
 2. Busque "Python 3.12" (ou 3.11)

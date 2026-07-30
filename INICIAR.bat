@@ -16,8 +16,9 @@ echo   1 - Abrir FORMULARIO  (fornecedores)
 echo   2 - Abrir DASHBOARD   (tela interna)
 echo   3 - Preparar PC pela primeira vez (instalar pacotes)
 echo   4 - Verificar se o Python esta instalado
-echo   5 - Mapear pasta de rede Alcoa (V:)
-echo   6 - Copiar projeto da rede para C:\Projetos\...
+echo   5 - Instalar Python 3.12 (se nao tiver)
+echo   6 - Mapear pasta de rede Alcoa (V:)
+echo   7 - Copiar projeto da rede para C:\Projetos\...
 echo   0 - Sair
 echo.
 set /p OPCAO=Digite o numero e pressione Enter: 
@@ -26,8 +27,9 @@ if "%OPCAO%"=="1" goto form
 if "%OPCAO%"=="2" goto dash
 if "%OPCAO%"=="3" goto setup
 if "%OPCAO%"=="4" goto check
-if "%OPCAO%"=="5" goto map
-if "%OPCAO%"=="6" goto copy
+if "%OPCAO%"=="5" goto pyinstall
+if "%OPCAO%"=="6" goto map
+if "%OPCAO%"=="7" goto copy
 if "%OPCAO%"=="0" goto fim
 echo Opcao invalida.
 pause
@@ -39,6 +41,10 @@ goto menu
 
 :setup
 call "%~dp0setup_outro_pc.bat"
+goto menu
+
+:pyinstall
+call "%~dp0instalar_python.bat"
 goto menu
 
 :map

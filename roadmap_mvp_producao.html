@@ -131,9 +131,9 @@ flowchart LR
         direction TB
         M1[Streamlit Cloud]
         M2[Login ID fornecedor]
-        M3[Dashboard user+senha]
+        M3[Dashboard interno]
         M4[Supabase + Storage FUP]
-        M5[JSON códigos local]
+        M5[JSON códigos no Storage]
     end
 
     subgraph basica [Produção básica]
@@ -157,7 +157,7 @@ flowchart LR
     mvp -->|oficializar| basica
     basica -->|compliance TI| forte
 
-    mvp --- MS[Seg: ID + senha + Secrets]
+    mvp --- MS[Seg: ID fornecedor + Secrets + JSON no Storage]
     mvp --- MO[Obs: codigo_fornecedor + Excel]
 
     basica --- BS[Seg: hash + IDs fixos + RLS]
@@ -181,15 +181,15 @@ flowchart TB
         F1C[(Supabase)]
         F1D[Storage FUP]
         F1E[fornecedores_codigos.json]
-        F1S[Segurança: ID · senha dash · HTTPS · fora do Git]
+        F1S[Segurança: ID fornecedor · HTTPS · fora do Git]
         F1O[Observabilidade: timestamps · export · Table Editor]
     end
 
     subgraph fase2 [Fase 2 - Produção básica]
         F2A[Mesmos apps - domínio *.alcoa.com.br]
         F2B[Tabela fornecedores no Supabase]
-        F2C[DASHBOARD_USERS_JSON com hash]
-        F2S[Segurança: RLS · IDs estáveis · senha forte]
+        F2C[JSON no Storage · tabela fornecedores]
+        F2S[Segurança: RLS · IDs estáveis · VPN/SSO no dash]
         F2O[Observabilidade: backup auto · logs de erro]
     end
 
@@ -248,7 +248,9 @@ Piloto           →   Processo oficializado    →   Compliance total</pre>
           <p><strong>Objetivo:</strong> validar processo com fornecedores reais.</p>
           <ul>
             <li>Formulário com login por ID</li>
-            <li>Dashboard com usuário/senha</li>
+            <li>Dashboard interno (não divulgar URL)</li>
+            <li>JSON de códigos no Storage (nuvem)</li>
+            <li>Export retorno FUP (Excel auxiliar)</li>
             <li>Supabase + FUP no Storage</li>
             <li>Streamlit Cloud</li>
             <li>Secrets fora do Git</li>
@@ -302,7 +304,7 @@ Piloto           →   Processo oficializado    →   Compliance total</pre>
           </tr>
           <tr>
             <td><strong>Acesso equipe</strong></td>
-            <td>Usuário + senha (Secrets)</td>
+            <td>URL restrita / VPN / SSO (MVP sem senha no app)</td>
             <td>Senha em hash, vários usuários</td>
             <td>SSO Azure AD + VPN</td>
           </tr>

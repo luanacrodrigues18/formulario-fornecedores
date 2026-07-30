@@ -13,7 +13,8 @@ load_dotenv()
 
 ARQUIVO_LOCAL = Path(__file__).parent / "dados_locais.json"
 
-_client: Client | None = None
+_client_anon: Client | None = None
+_client_service: Client | None = None
 
 
 def _ler_config(chave: str, padrao: str = "") -> str:
@@ -43,6 +44,11 @@ def supabase_key() -> str:
     return _ler_config("SUPABASE_KEY")
 
 
+def supabase_service_key() -> str:
+    """Chave service_role (só servidor). Bypassa RLS — nunca exponha no front/Git."""
+    return _ler_config("SUPABASE_SERVICE_ROLE_KEY") or _ler_config("SUPABASE_SERVICE_KEY")
+
+
 def supabase_table() -> str:
     return _ler_config("SUPABASE_TABLE", "formulario")
 
@@ -57,6 +63,10 @@ def supabase_fup_file() -> str:
 
 def supabase_codigos_file() -> str:
     return _ler_config("SUPABASE_CODIGOS_FILE", "fornecedores_codigos.json")
+
+
+def supabase_contas_file() -> str:
+    return _ler_config("SUPABASE_CONTAS_FILE", "contas_fornecedor.json")
 
 COLUNAS_EXIBICAO = {
     "id": "ID",
@@ -102,20 +112,39 @@ def email_valido(email: str) -> bool:
 
 
 def supabase_configurado() -> bool:
-    return bool(supabase_url() and supabase_key())
+    return bool(supabase_url() and (supabase_service_key() or supabase_key()))
+
+
+def usa_service_role() -> bool:
+    return bool(supabase_url() and supabase_service_key())
 
 
 def get_client() -> Client:
-    global _client
+    """
+    Cliente Supabase do backend.
+    Prefere SUPABASE_SERVICE_ROLE_KEY (bypassa RLS fechado).
+    Sem service role, cai na chave anon (só funciona com políticas abertas).
+    """
+    global _client_anon, _client_service
     url = supabase_url()
-    key = supabase_key()
-    if _client is None:
-        if not url or not key:
-            raise ValueError(
-                "Configure SUPABASE_URL e SUPABASE_KEY no .env ou nos Secrets do Streamlit."
-            )
-        _client = create_client(url, key)
-    return _client
+    if not url:
+        raise ValueError("Configure SUPABASE_URL no .env ou nos Secrets do Streamlit.")
+
+    service = supabase_service_key()
+    if service:
+        if _client_service is None:
+            _client_service = create_client(url, service)
+        return _client_service
+
+    anon = supabase_key()
+    if not anon:
+        raise ValueError(
+            "Configure SUPABASE_SERVICE_ROLE_KEY (recomendado) ou SUPABASE_KEY "
+            "no .env / Secrets."
+        )
+    if _client_anon is None:
+        _client_anon = create_client(url, anon)
+    return _client_anon
 
 
 def baixar_arquivo_storage(arquivo: str, destino: Path) -> None:
@@ -138,6 +167,28 @@ def baixar_arquivo_storage(arquivo: str, destino: Path) -> None:
             ) from exc
         raise
     destino.write_bytes(dados)
+
+
+def enviar_arquivo_storage(arquivo: str, origem: Path) -> None:
+    """Envia/atualiza um arquivo no Supabase Storage (upsert)."""
+    if not origem.is_file():
+        raise FileNotFoundError(f"Arquivo local não encontrado: {origem}")
+
+    client = get_client()
+    bucket = supabase_storage_bucket()
+    dados = origem.read_bytes()
+    opcoes = {"content-type": "application/json", "upsert": "true"}
+    try:
+        client.storage.from_(bucket).upload(arquivo, dados, opcoes)
+    except Exception:
+        try:
+            client.storage.from_(bucket).update(
+                arquivo,
+                dados,
+                {"content-type": "application/json"},
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Falha ao enviar '{arquivo}' ao Storage: {exc}") from exc
 
 
 def baixar_fup_storage(destino: Path) -> None:

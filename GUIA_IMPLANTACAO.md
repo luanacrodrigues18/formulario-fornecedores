@@ -1,34 +1,80 @@
 # Guia de implantação - Formulário de Fornecedores
 
-Documentação passo a passo do que foi configurado neste projeto: **Supabase** (banco + arquivo FUP), **login por código do fornecedor** e **Streamlit Cloud** (formulário público e dashboard).
+Documentação passo a passo: **Supabase** (banco + Storage), **cadastro/login com usuário e senha**, **RLS fechado com service_role** e **Streamlit Cloud**.
+
+---
+
+## Do zero ao piloto (checklist rápido)
+
+Siga **nesta ordem**:
+
+1. **Supabase → SQL Editor**  
+   Cole e rode o SQL completo de tabelas do [README.md](README.md) (seção *Criar tabelas no Supabase*):  
+   `formulario` + `contas_fornecedor` + `acessos_log`.
+
+2. **Supabase → Settings → API**  
+   Copie:
+   - Project URL → `SUPABASE_URL`
+   - `anon` `public` → `SUPABASE_KEY`
+   - `service_role` `secret` → `SUPABASE_SERVICE_ROLE_KEY`  
+   (**Reveal** na service_role; nunca publique essa chave.)
+
+3. **No PC**  
+   - `copy .env.example .env` e preencha as três chaves.  
+   - `pip install -r requirements.txt`  
+   - Coloque `relatorio_fup.xlsm` na pasta.  
+   - `python gerar_codigos_fornecedores.py`
+
+4. **Supabase → Storage**  
+   Bucket `Form` (preferência: **privado**).  
+   Upload: `relatorio_fup.xlsm` e `fornecedores_codigos.json`.
+
+5. **Fechar RLS**  
+   Com a `SERVICE_ROLE_KEY` já no `.env`, rode [`sql/fechar_rls.sql`](sql/fechar_rls.sql) no SQL Editor → **Run query**.
+
+6. **Subir o app**  
+   `streamlit run app.py` (ou `INICIAR.bat`).
+
+7. **Testar**  
+   - Cadastro: usuário + senha + código Alcoa.  
+   - Login: usuário (ou código) + senha.  
+   - Enviar um pedido.  
+   - Conferir no Table Editor: `contas_fornecedor`, `acessos_log`, `formulario`.
+
+8. **Streamlit Cloud (opcional)**  
+   Secrets iguais ao `.env` (incluindo `SUPABASE_SERVICE_ROLE_KEY`) + deploy de `app.py` / `dashboard.py`.
 
 ---
 
 ## Visão geral
 
 ```
-Fornecedor digita ID
+Fornecedor cria usuário + senha (código Alcoa da empresa)
         ↓
-fornecedores_codigos.json  →  resolve nome da empresa
+fornecedores_codigos.json  →  resolve nome na FUP
         ↓
-app.py filtra pedidos na FUP (só desse fornecedor)
+contas_fornecedor (Supabase) + acessos_log
         ↓
-envia resposta → Supabase (tabela formulario + codigo_fornecedor)
+app.py - página única: busca, lista e formulário
+        ↓
+envia resposta → tabela formulario (+ codigo_fornecedor)
 
-Equipe Alcoa  →  dashboard.py  →  lê Supabase
+Equipe Alcoa  →  dashboard.py  →  lê Supabase / exporta retorno FUP
 ```
 
 
-| Componente         | Arquivo                         | Função                              |
-| ------------------ | ------------------------------- | ----------------------------------- |
-| Formulário + login | `app.py`                        | Login por ID, busca e envio         |
-| Autenticação       | `auth_fornecedor.py`            | Sessão, tela de login, isolamento   |
-| Cadastro de IDs    | `fornecedores_codigos.json`     | Mapa `ID → nome do fornecedor`      |
-| Gerador de IDs     | `gerar_codigos_fornecedores.py` | Cria JSON a partir da FUP           |
-| Dashboard interno  | `dashboard.py`                  | Visualiza, filtra e exporta         |
-| Banco de dados     | `database.py`                   | Supabase, validação e gravação      |
-| Planilha FUP       | `planilha.py`                   | Lê pedidos da aba Follow-up-Release |
-| Assistente         | `alcoano.py`                    | ALUX — dicas e FAQ                  |
+| Componente         | Arquivo                         | Função                                      |
+| ------------------ | ------------------------------- | ------------------------------------------- |
+| Formulário         | `app.py`                        | Página única, busca e envio                 |
+| Autenticação       | `auth_fornecedor.py`            | Cadastro, login, redefinir senha            |
+| Contas             | `contas_fornecedor.py`          | Hash, bloqueio, logs, Supabase/JSON         |
+| Cadastro de IDs    | `fornecedores_codigos.json`     | Mapa `ID → nome do fornecedor`              |
+| Gerador de IDs     | `gerar_codigos_fornecedores.py` | Cria JSON a partir da FUP                   |
+| Dashboard interno  | `dashboard.py`                  | Visualiza, filtra, exporta e retorno FUP    |
+| Banco de dados     | `database.py`                   | Supabase (prefere service_role)             |
+| Planilha FUP       | `planilha.py`                   | Lê pedidos; exporta retorno sem gravar xlsm |
+| Assistente         | `alcoano.py`                    | ALUX - dicas e FAQ                          |
+| Fechar RLS         | `sql/fechar_rls.sql`            | Remove políticas públicas abertas           |
 
 
 **URLs de produção (exemplo deste projeto):**
@@ -40,7 +86,7 @@ Equipe Alcoa  →  dashboard.py  →  lê Supabase
 
 
 
-## Parte 1 — Configurar o Supabase
+## Parte 1 - Configurar o Supabase
 
 
 
@@ -79,20 +125,16 @@ CREATE TABLE IF NOT EXISTS formulario (
 ALTER TABLE formulario ADD COLUMN IF NOT EXISTS codigo_fornecedor TEXT;
 
 ALTER TABLE formulario ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Permitir leitura pública"
-ON formulario FOR SELECT
-USING (true);
-
-CREATE POLICY "Permitir inserção pública"
-ON formulario FOR INSERT
-WITH CHECK (true);
 ```
 
-1. Confirme em **Table Editor** que a tabela `formulario` foi criada **com** a coluna `codigo_fornecedor`.
+Em seguida, no **mesmo** SQL Editor (ou nova query), cole também do [README.md](README.md) a criação de `contas_fornecedor` (com coluna `usuario`) e `acessos_log`.
 
-> Sem essa coluna, o envio falha com erro `PGRST204` / schema cache.  
-> Em produção futura, revise as políticas RLS conforme a política de segurança da empresa.
+Ou rode tudo de uma vez copiando a seção completa **Criar tabelas no Supabase** do README.
+
+1. Confirme em **Table Editor** que `formulario`, `contas_fornecedor` e `acessos_log` existem.
+
+> Sem a coluna `codigo_fornecedor` em `formulario`, o envio falha com erro `PGRST204`.  
+> **Não deixe políticas públicas abertas em produção.** Configure `SUPABASE_SERVICE_ROLE_KEY` e rode [`sql/fechar_rls.sql`](sql/fechar_rls.sql).
 
 
 
@@ -101,30 +143,33 @@ WITH CHECK (true);
 O formulário precisa do arquivo `relatorio_fup.xlsm` para buscar pedidos. Na nuvem ele não vai no GitHub (é sensível/grande), então fica no **Supabase Storage**.
 
 1. No Supabase, abra **Storage**.
-2. Crie um bucket chamado `Form` (ou outro nome — se mudar, atualize o `.env`).
-3. Deixe o bucket **público** para leitura **ou** configure política de leitura para a chave `anon`.
+2. Crie um bucket chamado `Form` (ou outro nome - se mudar, atualize o `.env`).
+3. Prefira bucket **privado** (o app usa `service_role` no servidor).
 4. Faça upload do arquivo com o nome exato: `relatorio_fup.xlsm`
   - Evite acentos e espaços no nome do arquivo.
-  - O nome antigo `Relatório - FUP.xlsm` causava erro no Storage.
-5. (Opcional) Guarde uma cópia de `fornecedores_codigos.json` no mesmo bucket `Form` como **backup interno**. O app **não** baixa esse arquivo do Storage — o login usa o JSON **na pasta do projeto** (veja seção 2.5 e limitação na nuvem em 4.3).
+5. Faça upload também de `fornecedores_codigos.json` no **mesmo** bucket `Form`.
+  - O app baixa o JSON do Storage quando o arquivo não está na pasta do projeto.
+  - Localmente, use o JSON gerado com `gerar_codigos_fornecedores.py`.
 
 
 
-### 1.4 Copiar URL e chave da API
+### 1.4 Copiar URL e chaves da API
 
 1. Vá em **Project Settings** (ícone de engrenagem).
 2. Abra **API**.
 3. Copie na **mesma tela**:
-  - **Project URL** → vira `SUPABASE_URL`
-  - **anon public** (chave pública) → vira `SUPABASE_KEY`
+  - **Project URL** → `SUPABASE_URL`
+  - **anon public** → `SUPABASE_KEY`
+  - **service_role** (secret) → `SUPABASE_SERVICE_ROLE_KEY` (somente servidor; nunca no Git)
 
-**Atenção — erros comuns:**
+**Atenção - erros comuns:**
 
 
 | Problema                                           | Causa                                                          |
 | -------------------------------------------------- | -------------------------------------------------------------- |
-| `getaddrinfo failed` / `Name or service not known` | URL do Supabase digitada errada (ex.: `taaq` em vez de `taeq`) |
-| Dados não salvam / erro de autenticação            | URL de um projeto e chave `anon` de outro                      |
+| `getaddrinfo failed` / `Name or service not known` | URL do Supabase digitada errada                                |
+| Dados não salvam / erro de autenticação            | URL de um projeto e chave de outro                             |
+| Erro de permissão / RLS após fechar políticas      | Falta `SUPABASE_SERVICE_ROLE_KEY` no `.env` ou Secrets         |
 | Formulário na nuvem sem FUP                        | Arquivo não está no Storage ou nome diferente                  |
 
 
@@ -134,7 +179,7 @@ A URL deve ser algo como: `https://xxxxxxxx.supabase.co` (copiada exatamente do 
 
 
 
-## Parte 2 — Rodar localmente (teste antes do deploy)
+## Parte 2 - Rodar localmente (teste antes do deploy)
 
 
 
@@ -176,9 +221,11 @@ copy .env.example .env
 ```env
 SUPABASE_URL=https://SEU-PROJETO.supabase.co
 SUPABASE_KEY=sua-chave-anon-publica
+SUPABASE_SERVICE_ROLE_KEY=sua-chave-service-role-secreta
 SUPABASE_TABLE=formulario
 SUPABASE_STORAGE_BUCKET=Form
 SUPABASE_FUP_FILE=relatorio_fup.xlsm
+SUPABASE_CODIGOS_FILE=fornecedores_codigos.json
 FORM_BASE_URL=http://localhost:8501
 ```
 
@@ -199,8 +246,9 @@ Isso cria `fornecedores_codigos.json` (mapa ID → nome) e `fornecedores_codigos
 
 - **Com FUP local:** o app usa o arquivo da pasta (útil se a rede bloquear Supabase).
 - **Sem FUP local:** o app tenta baixar do Supabase Storage.
-- **Login por ID:** exige `fornecedores_codigos.json` **na pasta do projeto** (gerado com `gerar_codigos_fornecedores.py`).
-- **Sem JSON local:** o login por código não encontra nenhum fornecedor (upload no Storage **não** substitui o arquivo local hoje).
+- **Login (local):** cadastro com usuário + senha + código Alcoa; JSON de códigos na pasta.
+- **Login (nuvem):** mesmo fluxo; o app baixa `fornecedores_codigos.json` do Storage se faltar localmente.
+- **Sem JSON (local nem Storage):** o cadastro/login não resolve a empresa (“código não encontrado”).
 
 
 
@@ -214,10 +262,11 @@ streamlit run app.py
 
 Abra: `http://localhost:8501`
 
-1. Na tela de login, digite um ID (ex.: `6` para ACOS VITAL, conforme a lista gerada).
-2. Confira que só aparecem pedidos desse fornecedor.
-3. Use **Ver todos os meus pedidos** ou busque por PO com Release.
-4. Preencha e envie; confira no Supabase a coluna `codigo_fornecedor`.
+1. Na tela de **Cadastro**, crie usuário + senha e informe o código Alcoa (ex.: `6`).
+2. Vá ao **Login** e entre com o usuário (ou o código) + senha.
+3. Confira que só aparecem pedidos desse fornecedor.
+4. Use **Ver todos** ou busque por PO com Release; marque pedidos e envie.
+5. Confira no Supabase a coluna `codigo_fornecedor` e a tabela `contas_fornecedor`.
 
 **Dashboard:**
 
@@ -229,20 +278,23 @@ streamlit run dashboard.py
 
 ### 2.7 Checklist do teste local
 
-- [ ] Login com ID válido entra e mostra o nome do fornecedor
-- [ ] ID inválido mostra “Código não encontrado”
+- [ ] Cadastro com usuário + senha + código Alcoa válido
+- [ ] Login com usuário ou código + senha
+- [ ] Código Alcoa inválido mostra erro claro
+- [ ] Conta aparece em `contas_fornecedor` (Table Editor)
+- [ ] Evento de acesso aparece em `acessos_log`
 - [ ] Só pedidos daquele fornecedor aparecem
 - [ ] Busca por PO filtra dentro dos pedidos dele
 - [ ] Envio grava no Supabase com `codigo_fornecedor`
 - [ ] Dashboard mostra o registro
-- [ ] Segundo envio para o mesmo PO+linha é bloqueado
+- [ ] É possível enviar de novo para o mesmo PO+linha (gera novo registro)
 - [ ] Botão **Sair** encerra a sessão
 
 ---
 
 
 
-## Parte 2.8 — Cadastro de IDs (passo 1)
+## Parte 2.8 - Cadastro de IDs Alcoa
 
 A FUP **não tem coluna de código**. O isolamento funciona assim:
 
@@ -250,7 +302,9 @@ A FUP **não tem coluna de código**. O isolamento funciona assim:
 | Item                      | Onde fica                       |
 | ------------------------- | ------------------------------- |
 | Pedidos (PO, linha, item) | `relatorio_fup.xlsm`            |
-| ID de login               | `fornecedores_codigos.json`     |
+| ID / código Alcoa         | `fornecedores_codigos.json`     |
+| Conta (usuário + senha)   | tabela `contas_fornecedor`      |
+| Logs de acesso            | tabela `acessos_log`             |
 | Respostas enviadas        | tabela `formulario` no Supabase |
 
 
@@ -262,13 +316,13 @@ python gerar_codigos_fornecedores.py
 
 **Atenção:** regenerar o JSON por ordem alfabética pode **mudar os IDs**. Em produção, prefira IDs estáveis (código SAP) e edite o JSON manualmente.
 
-Na nuvem (Streamlit Cloud), o JSON **não vai no Git** (`.gitignore`). Para o login funcionar em produção, planeje: tabela `fornecedores` no Supabase, ou disponibilizar o JSON no deploy de forma controlada (repositório privado / pipeline interno).
+Na nuvem, o JSON **não vai no Git** (`.gitignore`). Faça upload de `fornecedores_codigos.json` no bucket `Form` (o app baixa no startup). Evolução futura: tabela `fornecedores` no Supabase.
 
 ---
 
 
 
-## Parte 3 — Publicar no GitHub
+## Parte 3 - Publicar no GitHub
 
 
 
@@ -279,6 +333,7 @@ Na nuvem (Streamlit Cloud), o JSON **não vai no Git** (`.gitignore`). Para o lo
 - `app.py`, `auth_fornecedor.py`, `dashboard.py`, `database.py`, `planilha.py`, `alcoano.py`
 - `gerar_codigos_fornecedores.py`, `gerar_template.py`
 - `requirements.txt`, `README.md`, `GUIA_IMPLANTACAO.md`, `DEPLOY_PRODUCAO.md`
+- `LEIA_PRIMEIRO.txt`, `INICIAR.bat`, scripts `*.bat` de setup
 - `.streamlit/config.toml`, `fornecedores_codigos.json.example`
 
 **NÃO vai** (`.gitignore`):
@@ -306,7 +361,7 @@ git push -u origin login-fornecedor
 
 
 
-## Parte 4 — Deploy no Streamlit Cloud
+## Parte 4 - Deploy no Streamlit Cloud
 
 
 
@@ -337,19 +392,21 @@ git push -u origin login-fornecedor
 ```toml
 SUPABASE_URL = "https://SEU-PROJETO.supabase.co"
 SUPABASE_KEY = "sua-chave-anon-publica"
+SUPABASE_SERVICE_ROLE_KEY = "sua-chave-service-role-secreta"
 SUPABASE_TABLE = "formulario"
 SUPABASE_STORAGE_BUCKET = "Form"
 SUPABASE_FUP_FILE = "relatorio_fup.xlsm"
+SUPABASE_CODIGOS_FILE = "fornecedores_codigos.json"
 FORM_BASE_URL = "https://formulario-fornecedores.streamlit.app"
 ```
 
 1. Salve e clique em **Reboot app**.
-2. Confirme no Storage o upload de `relatorio_fup.xlsm`.
+2. Confirme no Storage o upload de `relatorio_fup.xlsm` **e** `fornecedores_codigos.json`.
 3. Confirme no SQL Editor que existe a coluna `codigo_fornecedor`.
 
-> **Login na nuvem:** o app lê `fornecedores_codigos.json` só da pasta do projeto. Como o arquivo não vai no Git, o **login por ID não funciona no Streamlit Cloud** com o código atual — use o formulário local para testar login, ou evolua para tabela `fornecedores` no Supabase.
+> **Login na nuvem:** com o JSON no bucket `Form` e a `SUPABASE_SERVICE_ROLE_KEY` nos Secrets, o app baixa o cadastro e grava contas/respostas com RLS fechado.
 
-> Local usa `.env`. Na nuvem usa **Secrets** — são a mesma configuração, em lugares diferentes.
+> Local usa `.env`. Na nuvem usa **Secrets** - são a mesma configuração, em lugares diferentes.
 
 
 
@@ -379,14 +436,14 @@ No Streamlit Cloud: **⋮** → **Reboot app** (ou aguarde o redeploy automátic
 
 
 
-## Parte 5 — Verificação em produção
+## Parte 5 - Verificação em produção
 
 
 
 ### Formulário (`app.py`)
 
 1. Abra a URL pública do formulário.
-2. Faça login com um ID de teste.
+2. Faça cadastro (usuário + senha + código) e login.
 3. Confira isolamento (só pedidos daquele fornecedor).
 4. Preencha e envie.
 5. Confirme no Supabase (**Table Editor** → `formulario`) que o registro apareceu com `codigo_fornecedor`.
@@ -397,7 +454,9 @@ No Streamlit Cloud: **⋮** → **Reboot app** (ou aguarde o redeploy automátic
 
 1. Abra a URL do dashboard.
 2. Verifique se aparece a mensagem de dados carregados do Supabase.
-3. Confira métricas, filtros e exportação Excel.
+3. Confira métricas, filtros e exportação Excel das respostas.
+4. Use **Exportar retorno para Excel (sem mexer na FUP)** para gerar o auxiliar
+   (PO+linha + Data/Obs/NF com match na aba Follow-up-Release). O `.xlsm` principal **não** é alterado.
 
 ---
 
@@ -407,11 +466,11 @@ No Streamlit Cloud: **⋮** → **Reboot app** (ou aguarde o redeploy automátic
 
 
 
-### Código não encontrado no login
+### Código / usuário não encontrado no login
 
-**Causa:** `fornecedores_codigos.json` ausente na pasta do projeto, ou nome do fornecedor diferente do FUP.
+**Causa:** `fornecedores_codigos.json` ausente na pasta do projeto **e** no Storage, ou nome do fornecedor diferente do FUP.
 
-**Solução:** rode `python gerar_codigos_fornecedores.py` e use um ID da lista gerada. Na nuvem, o login só funcionará quando o JSON estiver disponível no ambiente de deploy (hoje não é baixado do Storage).
+**Solução:** rode `python gerar_codigos_fornecedores.py`, use um ID da lista e, na nuvem, faça upload do JSON no bucket `Form` (nome `fornecedores_codigos.json`).
 
 ### Erro `Could not find the 'codigo_fornecedor' column` (PGRST204)
 
@@ -480,15 +539,15 @@ Project Form/
 
 ## Resumo rápido (cola)
 
-1. **Supabase:** criar tabela `formulario` + coluna `codigo_fornecedor` + RLS + upload FUP (e JSON de códigos) no Storage.
+1. **Supabase:** tabelas `formulario`, `contas_fornecedor`, `acessos_log` + `fechar_rls.sql` + Storage (FUP e JSON) + `SERVICE_ROLE_KEY`.
 2. **Local:** `.env` + `pip install` + gerar códigos + `streamlit run app.py`.
-3. **Login:** fornecedor digita ID → vê só seus pedidos → envia.
+3. **Login:** cadastro (usuário + senha + código Alcoa) → login → só pedidos da empresa → envio.
 4. **GitHub:** push sem `.env`, sem FUP e sem `fornecedores_codigos.json`.
-5. **Streamlit Cloud:** deploy `app.py` e `dashboard.py` com os mesmos Secrets.
-6. **Testar:** login → envio → registro no Supabase com `codigo_fornecedor` → dashboard.
+5. **Streamlit Cloud:** deploy com Secrets (incluindo `SUPABASE_SERVICE_ROLE_KEY`).
+6. **Testar:** cadastro → login → envio → Supabase → dashboard.
 
 ---
 
-*Documentação gerada para o MVP do Formulário de Fornecedores Alcoa — junho/2026.*
+*Documentação do Formulário de Fornecedores Alcoa - atualizada em julho/2026.*
 
 **Próximo passo:** para evoluir a produção formal, consulte **[DEPLOY_PRODUCAO.md](DEPLOY_PRODUCAO.md)**.

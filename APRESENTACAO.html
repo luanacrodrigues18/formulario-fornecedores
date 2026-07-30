@@ -141,7 +141,7 @@
     <p style="font-size:3.5rem">📋</p>
     <h1>Formulário de Fornecedores</h1>
     <p class="subtitle">Coleta digital de promessas de entrega e follow-up de pedidos</p>
-    <p class="meta">Alcoa · Login por código · 2026</p>
+    <p class="meta">Alcoa · Usuário e senha · 2026</p>
   </section>
 
   <section class="slide">
@@ -158,9 +158,9 @@
   <section class="slide">
     <h2>Objetivo</h2>
     <div class="grid-2">
-      <div class="card"><h3>Fornecedor</h3><p>Formulário web simples, 3 passos, com assistente ALUX.</p></div>
+      <div class="card"><h3>Fornecedor</h3><p>Formulário web em página única, com assistente ALUX.</p></div>
       <div class="card"><h3>Alcoa</h3><p>Dashboard com filtros, gráficos e exportação Excel.</p></div>
-      <div class="card"><h3>Segurança</h3><p>Login por código exclusivo por empresa.</p></div>
+      <div class="card"><h3>Segurança</h3><p>Usuário + senha (hash), código Alcoa e RLS fechado.</p></div>
       <div class="card"><h3>Nuvem</h3><p>Streamlit Cloud + Supabase, sem instalar software.</p></div>
     </div>
   </section>
@@ -168,25 +168,25 @@
   <section class="slide">
     <h2>Funcionalidades</h2>
     <div class="grid-3">
-      <div class="card"><h3>Login por código</h3><p>ID enviado pela Alcoa.</p></div>
-      <div class="card"><h3>3 passos</h3><p>Buscar → linha → enviar.</p></div>
+      <div class="card"><h3>Cadastro e login</h3><p>Usuário + senha; código Alcoa da empresa.</p></div>
+      <div class="card"><h3>Página única</h3><p>Busca, lista e envio lado a lado.</p></div>
       <div class="card"><h3>ALUX</h3><p>Dicas e FAQ na sidebar.</p></div>
-      <div class="card"><h3>Minhas respostas</h3><p>Histórico na sessão.</p></div>
-      <div class="card"><h3>Dashboard</h3><p>Visão interna da equipe.</p></div>
-      <div class="card"><h3>Supabase</h3><p>Banco + Storage na nuvem.</p></div>
+      <div class="card"><h3>Vários pedidos</h3><p>Seleção múltipla e fila de preenchimento.</p></div>
+      <div class="card"><h3>Dashboard</h3><p>Filtros, export e retorno FUP auxiliar.</p></div>
+      <div class="card"><h3>Supabase</h3><p>Banco (contas, logs, respostas) + Storage.</p></div>
     </div>
   </section>
 
   <section class="slide">
     <h2>Fluxo do fornecedor</h2>
     <div class="grid-3">
-      <div class="card"><div class="step-num">1</div><h3>Login</h3><p>Entra com o código recebido.</p></div>
-      <div class="card"><div class="step-num">2</div><h3>Busca</h3><p>PO/Release ou todos os pedidos.</p></div>
+      <div class="card"><div class="step-num">1</div><h3>Cadastro / login</h3><p>Cria usuário e senha; depois entra.</p></div>
+      <div class="card"><div class="step-num">2</div><h3>Pedidos</h3><p>Busca ou lista e marca as linhas.</p></div>
       <div class="card"><div class="step-num">3</div><h3>Envio</h3><p>Preenche e recebe protocolo.</p></div>
     </div>
     <div class="flow">
-      <span class="flow-box">Código</span><span class="flow-arrow">→</span>
-      <span class="flow-box">Nome</span><span class="flow-arrow">→</span>
+      <span class="flow-box">Usuário</span><span class="flow-arrow">→</span>
+      <span class="flow-box">Código Alcoa</span><span class="flow-arrow">→</span>
       <span class="flow-box">Pedidos FUP</span><span class="flow-arrow">→</span>
       <span class="flow-box">Supabase</span>
     </div>
@@ -195,10 +195,10 @@
   <section class="slide">
     <h2>Autenticação</h2>
     <ul>
-      <li><code>fornecedores_codigos.json</code> mapeia ID → nome do fornecedor.</li>
-      <li>Gerado com <code>gerar_codigos_fornecedores.py</code> a partir da FUP.</li>
-      <li>Na nuvem: FUP e JSON baixados do Supabase Storage (bucket Form).</li>
-      <li>Um envio por PO + linha (sem duplicata).</li>
+      <li><code>fornecedores_codigos.json</code> mapeia código Alcoa → nome do fornecedor.</li>
+      <li>Conta: usuário + senha (hash) em <code>contas_fornecedor</code>.</li>
+      <li>Na nuvem: FUP e JSON no Storage; app com <code>service_role</code> e RLS fechado.</li>
+      <li>Vários envios permitidos (mesmo PO + linha gera novo registro).</li>
     </ul>
   </section>
 
@@ -209,6 +209,7 @@
       <li>Filtros por fornecedor, PO, data e status</li>
       <li>Top 10 fornecedores (gráfico)</li>
       <li>Exportação Excel formatada</li>
+      <li>Export retorno FUP (auxiliar, sem mexer no .xlsm)</li>
       <li>Links diretos para o formulário</li>
     </ul>
   </section>
@@ -245,7 +246,8 @@ Equipe Alcoa → dashboard.py</div>
     <table>
       <tr><th>Campo</th><th>Descrição</th></tr>
       <tr><td>Email / Nome</td><td>Responsável</td></tr>
-      <tr><td>Código fornecedor</td><td>ID de login</td></tr>
+      <tr><td>Código Alcoa</td><td>Vínculo empresa ↔ pedidos FUP</td></tr>
+      <tr><td>Usuário + senha</td><td>Login do fornecedor (hash)</td></tr>
       <tr><td>PO + Linha</td><td>Pedido selecionado</td></tr>
       <tr><td>Data promessa</td><td>Informada pelo fornecedor</td></tr>
       <tr><td>Observações / NF</td><td>Complementos</td></tr>
@@ -277,7 +279,7 @@ Equipe Alcoa → dashboard.py</div>
       <li>SSO / Azure AD</li>
       <li>Integração SAP</li>
       <li>Notificações por e-mail</li>
-      <li>Revisão RLS para produção</li>
+      <li>RLS fechado com service_role (já no MVP)</li>
     </ul>
   </section>
 

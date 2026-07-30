@@ -9,20 +9,16 @@ import streamlit as st
 BASE_DIR = Path(__file__).parent
 IMG_ALCOANO = BASE_DIR / "alcoano.png"
 
+MENSAGEM_PAGINA = (
+    "Oi! Sou o **ALUX**, seu assistente Alcoa. "
+    "Busque o pedido pela **PO com Release**, selecione a(s) linha(s) na lista "
+    "e preencha o formulário ao lado. Pode marcar vários pedidos e enviar um após o outro."
+)
+
 MENSAGENS_PASSO = {
-    1: (
-        "Oi! Sou o **ALUX**, seu assistente Alcoa. "
-        "No passo 1, busque seu pedido pelo **nome da empresa** ou pelo **PO com Release** "
-        "que você recebeu por e-mail."
-    ),
-    2: (
-        "Ótimo progresso! Agora escolha a **linha correta** do pedido. "
-        "Se houver várias linhas, confira a descrição do item antes de continuar."
-    ),
-    3: (
-        "Quase lá! Confira o **e-mail**, a **data de promessa** e, se já tiver, "
-        "informe a **NF** e **observações de coleta**. Depois é só enviar."
-    ),
+    1: MENSAGEM_PAGINA,
+    2: MENSAGEM_PAGINA,
+    3: MENSAGEM_PAGINA,
 }
 
 MENSAGEM_SUCESSO = (
@@ -53,8 +49,9 @@ FAQ: list[tuple[str, str]] = [
     ),
     (
         "Posso enviar mais de uma vez para o mesmo pedido?",
-        "Não. O sistema aceita **uma resposta por PO + linha** para evitar duplicidade. "
-        "Se precisar corrigir algo, entre em contato com a equipe Alcoa.",
+        "Sim. Você pode enviar novamente para o mesmo PO + linha — "
+        "cada envio gera um novo registro. Também pode selecionar vários pedidos na lista "
+        "e preenchê-los um após o outro.",
     ),
     (
         "O que colocar em Observações de Coleta?",
@@ -72,9 +69,14 @@ FAQ: list[tuple[str, str]] = [
         "Evite e-mails genéricos ou pessoais que a equipe não consiga identificar.",
     ),
     (
+        "Como entro sem o link do pedido?",
+        "Digite seu **código** e a **senha**. Na primeira vez, confirme a senha — "
+        "ela é criada e salva automaticamente. Depois é só código + senha.",
+    ),
+    (
         "Recebi um link por e-mail — como uso?",
-        "Clique no link recebido. Ele abre o formulário **já com PO e linha preenchidos**. "
-        "Basta revisar os dados e concluir o envio.",
+        "Clique no link. Se ainda não tiver senha, o sistema pede para criar. "
+        "Se já tiver, entre com a senha. O formulário já identifica o PO e a linha.",
     ),
     (
         "Não encontrei meu pedido na busca",
@@ -84,8 +86,8 @@ FAQ: list[tuple[str, str]] = [
     ),
     (
         "Posso alterar uma resposta já enviada?",
-        "Pelo formulário, não — o envio fica registrado. Para correções, "
-        "informe o **número de protocolo** (ID) à equipe Alcoa responsável.",
+        "Você pode **enviar de novo** para o mesmo PO + linha (gera um novo protocolo). "
+        "Para ajustes pontuais, também pode informar o número de protocolo à equipe Alcoa.",
     ),
     (
         "Quem recebe os dados que envio?",
@@ -197,25 +199,21 @@ def render_bubble(mensagem: str, nome: str = "ALUX") -> None:
 
 
 def render_mensagem_passo(passo: int, compact: bool = False) -> None:
-    mensagem = MENSAGENS_PASSO.get(passo)
+    mensagem = MENSAGENS_PASSO.get(passo, MENSAGEM_PAGINA)
     if mensagem:
         render_bubble(mensagem)
+
+
+def render_mensagem_pagina() -> None:
+    render_bubble(MENSAGEM_PAGINA)
 
 
 def render_mensagem_sucesso(compact: bool = False) -> None:
     render_bubble(MENSAGEM_SUCESSO)
 
 
-def render_dicas_formulario() -> None:
-    with st.expander("💡 Dicas do ALUX: o que preencher em cada campo", expanded=False):
-        st.markdown(
-            """
-            <style>
-            .alcoano-dica-label { font-weight: 600; color: #1e3a5f; margin-bottom: 0.15rem; }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
+def render_dicas_formulario(com_expander: bool = True) -> None:
+    def _conteudo() -> None:
         for rotulo, chave in [
             ("📧 E-mail", "email"),
             ("👤 Nome / Fornecedor", "nome"),
@@ -226,20 +224,33 @@ def render_dicas_formulario() -> None:
             st.markdown(f"**{rotulo}**")
             st.caption(DICAS_CAMPOS[chave])
 
+    if com_expander:
+        with st.expander("💡 Dicas", expanded=False):
+            _conteudo()
+    else:
+        _conteudo()
 
-def render_faq() -> None:
-    with st.expander("❓ Perguntas frequentes ALUX", expanded=False):
+
+def render_faq(com_expander: bool = True) -> None:
+    def _conteudo() -> None:
         opcoes = [pergunta for pergunta, _ in FAQ]
         escolha = st.selectbox(
             "Selecione uma dúvida:",
             opcoes,
             index=0,
             label_visibility="collapsed",
+            key="faq_select_sidebar",
         )
         for pergunta, resposta in FAQ:
             if pergunta == escolha:
                 st.info(resposta)
                 break
+
+    if com_expander:
+        with st.expander("❓ FAQ", expanded=False):
+            _conteudo()
+    else:
+        _conteudo()
 
 
 def help_campo(chave: str) -> str:
