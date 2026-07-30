@@ -755,12 +755,32 @@ try:
 except Exception:
     pass
 
+try:
+    from prazo_resposta import garantir_arquivo_prazo, texto_aviso_fornecedor
+
+    garantir_arquivo_prazo()
+except Exception:
+    texto_aviso_fornecedor = None  # type: ignore
+
 if not autenticado():
     _render_sidebar()
     render_tela_login()
     st.stop()
 
 _aplicar_link_direto()
+
+if texto_aviso_fornecedor:
+    aviso = texto_aviso_fornecedor()
+    if aviso:
+        from prazo_resposta import dias_restantes
+
+        restante = dias_restantes()
+        if restante is not None and restante < 0:
+            st.warning(aviso)
+        elif restante == 0:
+            st.error(aviso)
+        else:
+            st.info(aviso)
 
 if st.session_state.get("_link_invalido"):
     po_inv, linha_inv = st.session_state._link_invalido

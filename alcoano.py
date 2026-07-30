@@ -29,7 +29,8 @@ MENSAGEM_SUCESSO = (
 DICAS_CAMPOS = {
     "email": "Use um e-mail válido da sua empresa. A Alcoa pode usar esse contato para retorno.",
     "nome": "Informe o nome da empresa fornecedora, como consta no pedido.",
-    "data_promessa": "Data em que o material estará disponível para coleta ou entrega conforme combinado.",
+    "data_promessa": "Data em que o material estará disponível para coleta ou entrega. "
+    "Isso é o retorno do fornecedor — diferente do prazo (definido pela Alcoa) para preencher este formulário.",
     "observacoes_coleta": "Detalhes úteis: horário de coleta, restrições de acesso, contato no local, etc.",
     "numero_nf": "Número da Nota Fiscal, se já emitida. Se ainda não tiver, pode deixar em branco e completar depois.",
     "po": "Código completo do pedido, geralmente no formato **4133600-23** (número + release).",

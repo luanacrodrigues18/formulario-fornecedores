@@ -379,7 +379,13 @@ def validar_registro(dados: dict[str, Any]) -> list[str]:
     return erros
 
 
-FUSO_BRASIL = ZoneInfo("America/Sao_Paulo")
+try:
+    # IANA tz: na nuvem precisa do pacote tzdata (ver requirements.txt)
+    FUSO_BRASIL = ZoneInfo("America/Sao_Paulo")
+except Exception:
+    from datetime import timedelta, timezone
+
+    FUSO_BRASIL = timezone(timedelta(hours=-3))
 
 
 def agora_brasil() -> datetime:

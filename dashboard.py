@@ -23,6 +23,16 @@ from database import (
     valor_vazio,
 )
 from planilha import buscar_por_po_e_linha, montar_link_formulario, exportar_retorno_fup_excel
+from prazo_resposta import (
+    carregar_prazo,
+    contar_por_prazo,
+    data_limite_atual,
+    data_limite_em_dias,
+    garantir_arquivo_prazo,
+    limpar_prazo,
+    salvar_prazo,
+    status_prazo_envio,
+)
 from pathlib import Path
 
 st.set_page_config(
@@ -33,6 +43,7 @@ st.set_page_config(
 
 COLUNAS_ORDEM = list(COLUNAS_EXIBICAO.keys())
 COL_STATUS = "Status"
+COL_PRAZO = "Prazo do form"
 LARGURAS_COLUNAS = [8, 18, 22, 22, 30, 25, 28, 18, 35, 18, 22]
 COL_NF = COLUNAS_EXIBICAO["numero_nf"]
 COL_OBS = COLUNAS_EXIBICAO["observacoes_coleta"]
@@ -90,13 +101,17 @@ def contar_sem_nf(registros: list[dict]) -> int:
 
 def registros_para_dataframe(registros: list[dict]) -> pd.DataFrame:
     colunas = [COLUNAS_EXIBICAO[c] for c in COLUNAS_ORDEM]
-    colunas_tabela = [colunas[0], COL_STATUS] + colunas[1:]
+    colunas_tabela = [colunas[0], COL_STATUS, COL_PRAZO] + colunas[1:]
+    limite = data_limite_atual()
     if not registros:
         return pd.DataFrame(columns=colunas_tabela)
 
     linhas = []
     for registro in registros:
-        linha = {COL_STATUS: status_registro(registro)}
+        linha = {
+            COL_STATUS: status_registro(registro),
+            COL_PRAZO: status_prazo_envio(registro, limite),
+        }
         for campo in COLUNAS_ORDEM:
             valor = registro.get(campo, "")
             if campo in ("hora_inicio", "hora_conclusao"):
@@ -127,9 +142,10 @@ def gerar_excel(registros: list[dict]) -> bytes:
     ws.title = "Fornecedores"
 
     cabecalhos = [COLUNAS_EXIBICAO[c] for c in COLUNAS_ORDEM]
-    cabecalhos_excel = [cabecalhos[0], COL_STATUS] + cabecalhos[1:]
+    cabecalhos_excel = [cabecalhos[0], COL_STATUS, COL_PRAZO] + cabecalhos[1:]
     fill = PatternFill(start_color="1E3A5F", end_color="1E3A5F", fill_type="solid")
     font = Font(bold=True, color="FFFFFF")
+    limite = data_limite_atual()
 
     for col_idx, titulo in enumerate(cabecalhos_excel, start=1):
         cell = ws.cell(row=1, column=col_idx, value=titulo)
@@ -140,13 +156,14 @@ def gerar_excel(registros: list[dict]) -> bytes:
     for row_idx, registro in enumerate(registros, start=2):
         ws.cell(row=row_idx, column=1, value=registro.get("id", ""))
         ws.cell(row=row_idx, column=2, value=status_registro(registro))
-        for col_idx, campo in enumerate(COLUNAS_ORDEM[1:], start=3):
+        ws.cell(row=row_idx, column=3, value=status_prazo_envio(registro, limite))
+        for col_idx, campo in enumerate(COLUNAS_ORDEM[1:], start=4):
             valor = registro.get(campo, "")
             if campo in ("hora_inicio", "hora_conclusao"):
                 valor = formatar_datetime(valor)
             ws.cell(row=row_idx, column=col_idx, value=valor)
 
-    for idx, largura in enumerate(LARGURAS_COLUNAS, start=1):
+    for idx, largura in enumerate([8, 14, 14] + LARGURAS_COLUNAS[1:], start=1):
         ws.column_dimensions[get_column_letter(idx)].width = largura
 
     ws.freeze_panes = "A2"
@@ -167,11 +184,18 @@ def aplicar_filtros(
     busca_geral: str,
     filtro_data,
     somente_incompletos: bool = False,
+    filtro_prazo: str = "Todos",
 ) -> list[dict]:
     resultado = registros
+    limite = data_limite_atual()
 
     if somente_incompletos:
         resultado = [r for r in resultado if registro_incompleto(r)]
+
+    if filtro_prazo and filtro_prazo != "Todos":
+        resultado = [
+            r for r in resultado if status_prazo_envio(r, limite) == filtro_prazo
+        ]
 
     if filtro_nome.strip():
         termo = filtro_nome.strip().lower()
@@ -311,6 +335,11 @@ st.caption(
     "Linhas em amarelo = sem NF ou sem observação"
 )
 
+try:
+    garantir_arquivo_prazo()
+except Exception:
+    pass
+
 if supabase_configurado():
     try:
         criar_tabela()
@@ -327,6 +356,8 @@ except Exception as exc:
     st.stop()
 
 ultimo = ultimo_envio(registros)
+limite_atual = data_limite_atual()
+contagem_prazo = contar_por_prazo(registros, limite_atual)
 
 # ── Cards ───────────────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5 = st.columns(5)
@@ -338,6 +369,89 @@ c5.metric(
     "Último envio",
     ultimo.strftime("%d/%m %H:%M") if ultimo else "—",
 )
+
+if limite_atual:
+    p1, p2, p3 = st.columns(3)
+    p1.metric("Retornos no prazo", contagem_prazo.get("No prazo", 0))
+    p2.metric("Retornos atrasados", contagem_prazo.get("Atrasado", 0))
+    p3.metric("Data limite do form", limite_atual.strftime("%d/%m/%Y"))
+
+# ── Prazo para preencher o formulário ───────────────────────────────────────
+with st.expander("⏰ Prazo para o fornecedor preencher o formulário", expanded=not limite_atual):
+    st.markdown(
+        """
+        Defina até quando o fornecedor deve **abrir o formulário e enviar o retorno**.
+        No retorno, o fornecedor informa a **Data da Promessa** (quando o material estará pronto).
+
+        - **X dias** → calcula a data limite a partir de hoje e grava essa data fixa  
+        - **Data limite** → você escolhe o dia final  
+        """
+    )
+    cfg = carregar_prazo()
+    if limite_atual:
+        obs_atual = (cfg or {}).get("observacao") or ""
+        st.info(
+            f"Prazo atual: **{limite_atual.strftime('%d/%m/%Y')}**"
+            + (f" — {obs_atual}" if obs_atual else "")
+        )
+
+    modo = st.radio(
+        "Como definir",
+        ["Em X dias (a partir de hoje)", "Data limite fixa"],
+        horizontal=True,
+        key="modo_prazo",
+    )
+    obs = st.text_input(
+        "Observação (opcional, aparece no formulário)",
+        value=(cfg or {}).get("observacao", "") if cfg else "",
+        placeholder="Ex.: campanha FUP julho",
+        key="obs_prazo",
+    )
+
+    col_a, col_b, col_c = st.columns([2, 1, 1])
+    with col_a:
+        if modo.startswith("Em X"):
+            dias_prazo = st.number_input(
+                "Dias para responder",
+                min_value=0,
+                max_value=365,
+                value=int((cfg or {}).get("dias_origem") or 7),
+                step=1,
+                key="dias_prazo",
+            )
+            preview = data_limite_em_dias(int(dias_prazo))
+            st.caption(f"Data limite calculada: **{preview.strftime('%d/%m/%Y')}**")
+        else:
+            valor_data = limite_atual or (agora.date() + timedelta(days=7))
+            data_escolhida = st.date_input(
+                "Data limite",
+                value=valor_data,
+                format="DD/MM/YYYY",
+                key="data_prazo",
+            )
+            dias_prazo = None
+            preview = data_escolhida
+
+    with col_b:
+        st.write("")
+        st.write("")
+        if st.button("Salvar prazo", type="primary", use_container_width=True):
+            try:
+                salvar_prazo(
+                    preview,
+                    dias_origem=int(dias_prazo) if dias_prazo is not None else None,
+                    observacao=obs,
+                )
+                st.success(f"Prazo salvo: {preview.strftime('%d/%m/%Y')}")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Erro ao salvar prazo: {exc}")
+    with col_c:
+        st.write("")
+        st.write("")
+        if st.button("Remover prazo", use_container_width=True, disabled=not limite_atual):
+            limpar_prazo()
+            st.rerun()
 
 # ── Gráficos ────────────────────────────────────────────────────────────────
 if registros:
@@ -439,6 +553,11 @@ with f7:
         "⚠️ Só incompletos",
         help="Exibe apenas registros sem NF ou sem observação de coleta.",
     )
+    filtro_prazo = st.selectbox(
+        "Prazo do form",
+        ["Todos", "No prazo", "Atrasado", "Sem prazo", "Sem data"],
+        help="Compara a data do envio com a data limite definida acima.",
+    )
 with f8:
     itens_pagina = st.selectbox("Registros por página", OPCOES_PAGINA, index=1)
 
@@ -452,6 +571,7 @@ registros_filtrados = aplicar_filtros(
     busca_geral,
     filtro_data,
     somente_incompletos,
+    filtro_prazo,
 )
 
 total_paginas = max(1, (len(registros_filtrados) + itens_pagina - 1) // itens_pagina)
