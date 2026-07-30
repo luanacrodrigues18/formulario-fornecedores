@@ -8,7 +8,7 @@ if exist "%~dp0caminhos_rede_alcoa.bat" call "%~dp0caminhos_rede_alcoa.bat"
 cls
 echo.
 echo  ========================================================
-echo   FORMULARIO DE FORNECEDORES — Alcoa
+echo   FORMULARIO DE FORNECEDORES - Alcoa
 echo   Use este menu. Nao precisa saber programar.
 echo  ========================================================
 echo.

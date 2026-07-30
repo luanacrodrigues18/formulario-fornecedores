@@ -1,5 +1,5 @@
 ========================================================================
-  LEIA ISTO PRIMEIRO  —  para quem vai receber o projeto
+  LEIA ISTO PRIMEIRO  -  para quem vai receber o projeto
 ========================================================================
 
 Oi! Você não precisa entender de programação.
@@ -16,7 +16,7 @@ Tem DOIS jeitos. Escolha UM:
 
 
 ========================================================================
-JEITO A — SÓ PELA INTERNET (mais fácil)
+JEITO A - SÓ PELA INTERNET (mais fácil)
 ========================================================================
 Não precisa instalar nada no computador.
 
@@ -29,10 +29,10 @@ Não precisa instalar nada no computador.
 
 
 ========================================================================
-JEITO B — NO COMPUTADOR (se precisar rodar local)
+JEITO B - NO COMPUTADOR (se precisar rodar local)
 ========================================================================
 
-PASSO 1 — Python no PC
+PASSO 1 - Python no PC
   Se NAO tiver Python:
     Duplo clique em:  instalar_python.bat
     Depois FECHE e ABRA de novo o Explorer.
@@ -45,7 +45,7 @@ PASSO 1 — Python no PC
   - Se aparecer [FALHOU] → peça à TI o Python 3.12, ou use só pelos links da nuvem
 
 
-PASSO 2 — Preparar a pasta (só na primeira vez)
+PASSO 2 - Preparar a pasta (só na primeira vez)
   Dê duplo clique em:  INICIAR.bat
 
   Ele vai:
@@ -54,7 +54,7 @@ PASSO 2 — Preparar a pasta (só na primeira vez)
     - abrir o formulário ou o dashboard
 
 
-PASSO 3 — No dia a dia
+PASSO 3 - No dia a dia
   Duplo clique de novo em:  INICIAR.bat
   Escolha:
     1 = Formulário

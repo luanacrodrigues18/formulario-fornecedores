@@ -4,9 +4,9 @@ Sistema em Python com **Streamlit** e **Supabase** para coleta de retorno de for
 
 ## Funcionalidades
 
-- **Cadastro** — o fornecedor cria **usuário** + **senha** (vinculado ao código Alcoa da empresa)
-- **Login** — entra com **usuário ou código Alcoa** + senha
-- **Redefinir senha** — exige a senha atual (sem recuperação por e-mail no fluxo atual)
+- **Cadastro** - o fornecedor cria **usuário** + **senha** (vinculado ao código Alcoa da empresa)
+- **Login** - entra com **usuário ou código Alcoa** + senha
+- **Redefinir senha** - exige a senha atual (sem recuperação por e-mail no fluxo atual)
 - Formulário em **página única** (busca + lista + formulário lado a lado)
 - Seleção de **vários pedidos** e preenchimento em sequência
 - Assistente **ALUX** (dicas e FAQ na sidebar)
@@ -53,7 +53,7 @@ FORM_BASE_URL=http://localhost:8501
 ```
 
 - **anon (`SUPABASE_KEY`)**: chave pública (Settings → API).
-- **service_role (`SUPABASE_SERVICE_ROLE_KEY`)**: chave secreta do servidor — **nunca** publique no Git nem no front. Necessária com o RLS fechado (`sql/fechar_rls.sql`).
+- **service_role (`SUPABASE_SERVICE_ROLE_KEY`)**: chave secreta do servidor - **nunca** publique no Git nem no front. Necessária com o RLS fechado (`sql/fechar_rls.sql`).
 
 No Streamlit Cloud, use as mesmas chaves em **Secrets**.
 
@@ -135,7 +135,7 @@ Código Alcoa  →  fornecedores_codigos.json  →  Nome na FUP
 | Recurso | Detalhe |
 |---------|---------|
 | Senha forte | Mínimo 8 caracteres, com letra e número |
-| Hash | PBKDF2 — senha não fica em texto puro |
+| Hash | PBKDF2 - senha não fica em texto puro |
 | Bloqueio | Após falhas de login (padrão: 5 / 15 min) |
 | Rotação | Troca obrigatória após 90 dias (configurável) |
 | Redefinir | Exige senha atual |
