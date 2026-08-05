@@ -1,4 +1,4 @@
-streamlit==1.48.2
+streamlit==1.48.1
 supabase
 python-dotenv
 openpyxl
