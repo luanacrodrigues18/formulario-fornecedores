@@ -676,8 +676,13 @@ def _resetar_fluxo() -> None:
     st.session_state.ultimo_registro = None
     st.session_state.hora_inicio = datetime.now().isoformat()
     st.session_state.link_processado = False
-    st.session_state._linhas_cache = []
-    st.session_state.mostrar_todos = False
+    # Ao voltar da tela de sucesso, já mostra a lista completa
+    # (sem precisar clicar de novo em "Ver todos").
+    if "busca_po_unica" in st.session_state:
+        st.session_state.busca_po_unica = ""
+    minhas = linhas_do_fornecedor_logado()
+    st.session_state._linhas_cache = minhas
+    st.session_state.mostrar_todos = True
 
 
 def _aplicar_link_direto() -> None:
