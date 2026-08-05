@@ -1,45 +1,53 @@
 from datetime import date, datetime, timedelta
 from io import BytesIO
 import os
-
-import altair as alt
-import pandas as pd
-import streamlit as st
-import streamlit.components.v1 as components
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
-
-from database import (
-    COLUNAS_EXIBICAO,
-    agora_brasil,
-    buscar_todos,
-    criar_tabela,
-    formatar_datetime,
-    parse_datetime,
-    registro_incompleto,
-    status_registro,
-    supabase_configurado,
-    valor_vazio,
-)
-from planilha import buscar_por_po_e_linha, montar_link_formulario, exportar_retorno_fup_excel
-from prazo_resposta import (
-    carregar_prazo,
-    contar_por_prazo,
-    data_limite_atual,
-    data_limite_em_dias,
-    garantir_arquivo_prazo,
-    limpar_prazo,
-    salvar_prazo,
-    status_prazo_envio,
-)
+import traceback
 from pathlib import Path
+
+import streamlit as st
 
 st.set_page_config(
     page_title="Dashboard - Fornecedores",
     page_icon="📊",
     layout="wide",
 )
+
+try:
+    import altair as alt
+    import pandas as pd
+    import streamlit.components.v1 as components
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    from database import (
+        COLUNAS_EXIBICAO,
+        agora_brasil,
+        buscar_todos,
+        criar_tabela,
+        formatar_datetime,
+        parse_datetime,
+        registro_incompleto,
+        status_registro,
+        supabase_configurado,
+        valor_vazio,
+    )
+    from planilha import buscar_por_po_e_linha, montar_link_formulario, exportar_retorno_fup_excel
+    from prazo_resposta import (
+        carregar_prazo,
+        contar_por_prazo,
+        data_limite_atual,
+        data_limite_em_dias,
+        garantir_arquivo_prazo,
+        limpar_prazo,
+        salvar_prazo,
+        status_prazo_envio,
+    )
+except Exception as exc:
+    st.error("Falha ao iniciar o dashboard (importação).")
+    st.code(f"{type(exc).__name__}: {exc}")
+    st.code(traceback.format_exc())
+    st.stop()
 
 COLUNAS_ORDEM = list(COLUNAS_EXIBICAO.keys())
 COL_STATUS = "Status"
@@ -317,7 +325,7 @@ with col_titulo:
     st.title("📊 Dashboard de Fornecedores")
 with col_btn1:
     st.write("")
-    if st.button("🔄 Atualizar", type="primary", use_container_width=True):
+    if st.button("🔄 Atualizar", type="primary", width="stretch"):
         st.rerun()
 with col_btn2:
     st.write("")
@@ -435,7 +443,7 @@ with st.expander("⏰ Prazo para o fornecedor preencher o formulário", expanded
     with col_b:
         st.write("")
         st.write("")
-        if st.button("Salvar prazo", type="primary", use_container_width=True):
+        if st.button("Salvar prazo", type="primary", width="stretch"):
             try:
                 salvar_prazo(
                     preview,
@@ -449,7 +457,7 @@ with st.expander("⏰ Prazo para o fornecedor preencher o formulário", expanded
     with col_c:
         st.write("")
         st.write("")
-        if st.button("Remover prazo", use_container_width=True, disabled=not limite_atual):
+        if st.button("Remover prazo", width="stretch", disabled=not limite_atual):
             limpar_prazo()
             st.rerun()
 
@@ -459,11 +467,11 @@ if registros:
     with g1:
         st.subheader("Envios por dia (7 dias)")
         df_dias = grafico_envios_por_dia(registros)
-        st.altair_chart(_chart_envios_por_dia(df_dias), use_container_width=True)
+        st.altair_chart(_chart_envios_por_dia(df_dias), width="stretch")
     with g2:
         st.subheader("Top 10 fornecedores")
         df_top = grafico_top_fornecedores(registros)
-        st.altair_chart(_chart_top_fornecedores(df_top), use_container_width=True)
+        st.altair_chart(_chart_top_fornecedores(df_top), width="stretch")
 
 # ── Gerador de link ─────────────────────────────────────────────────────────
 with st.expander("🔗 Gerar link para fornecedor", expanded=False):
@@ -614,7 +622,7 @@ registros_pagina = registros_filtrados[inicio:fim]
 # ── Tabela ──────────────────────────────────────────────────────────────────
 if registros_pagina:
     df = registros_para_dataframe(registros_pagina)
-    st.dataframe(aplicar_destaque(df), use_container_width=True, hide_index=True)
+    st.dataframe(aplicar_destaque(df), width="stretch", hide_index=True)
 
     excel_bytes = gerar_excel(registros_filtrados)
     nome_arquivo = f"fornecedores_{agora.strftime('%Y%m%d_%H%M%S')}.xlsx"

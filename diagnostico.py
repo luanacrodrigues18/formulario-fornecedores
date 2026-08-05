@@ -8,6 +8,19 @@ st.set_page_config(page_title="Diagnóstico", page_icon="🩺")
 st.title("Diagnóstico Streamlit Cloud")
 st.write("Se você vê esta tela, o deploy básico funciona.")
 st.write(f"Python: `{sys.version}`")
+st.write(f"Streamlit: `{st.__version__}`")
+
+st.subheader("API de botão")
+try:
+    st.button("teste width=stretch", width="stretch", key="btn_width")
+    st.success("width='stretch' OK")
+except TypeError as exc:
+    st.warning(f"width não suportado: {exc}")
+    try:
+        st.button("teste use_container_width", use_container_width=True, key="btn_ucw")
+        st.success("use_container_width OK")
+    except TypeError as exc2:
+        st.error(f"Nenhuma API de largura funcionou: {exc2}")
 
 st.subheader("Dependências")
 for nome in ("streamlit", "supabase", "pandas", "openpyxl", "altair", "tzdata", "dotenv"):

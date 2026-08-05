@@ -2,45 +2,9 @@ from datetime import date, datetime
 from pathlib import Path
 import html
 import warnings
+import traceback
 
-import pandas as pd
 import streamlit as st
-
-warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
-
-from database import (
-    COLUNAS_EXIBICAO,
-    buscar_resposta_por_po_linha,
-    formatar_datetime,
-    salvar_registro,
-    validar_registro,
-)
-from alcoano import (
-    ALCOANO_CSS,
-    help_campo,
-    render_dicas_formulario,
-    render_faq,
-    render_mensagem_pagina,
-    render_mensagem_sucesso,
-)
-from planilha import (
-    ARQUIVO_FUP,
-    buscar_por_po_e_linha,
-    data_promessa_inicial,
-    garantir_arquivo_codigos,
-    garantir_arquivo_fup,
-    listar_fornecedores,
-)
-import planilha as planilha_mod
-from auth_fornecedor import (
-    autenticado,
-    codigo_atual,
-    filtrar_linhas_do_fornecedor,
-    fornecedor_atual,
-    linhas_do_fornecedor_logado,
-    render_resumo_sessao_sidebar,
-    render_tela_login,
-)
 
 st.set_page_config(
     page_title="Formulário de Fornecedores",
@@ -48,6 +12,50 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+try:
+    import pandas as pd
+
+    warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
+
+    from database import (
+        COLUNAS_EXIBICAO,
+        buscar_resposta_por_po_linha,
+        formatar_datetime,
+        salvar_registro,
+        validar_registro,
+    )
+    from alcoano import (
+        ALCOANO_CSS,
+        help_campo,
+        render_dicas_formulario,
+        render_faq,
+        render_mensagem_pagina,
+        render_mensagem_sucesso,
+    )
+    from planilha import (
+        ARQUIVO_FUP,
+        buscar_por_po_e_linha,
+        data_promessa_inicial,
+        garantir_arquivo_codigos,
+        garantir_arquivo_fup,
+        listar_fornecedores,
+    )
+    import planilha as planilha_mod
+    from auth_fornecedor import (
+        autenticado,
+        codigo_atual,
+        filtrar_linhas_do_fornecedor,
+        fornecedor_atual,
+        linhas_do_fornecedor_logado,
+        render_resumo_sessao_sidebar,
+        render_tela_login,
+    )
+except Exception as exc:
+    st.error("Falha ao iniciar o formulário (importação).")
+    st.code(f"{type(exc).__name__}: {exc}")
+    st.code(traceback.format_exc())
+    st.stop()
 
 st.markdown(
     """
@@ -825,7 +833,7 @@ if _sucesso:
         st.markdown('<div class="detalhe-tabela">', unsafe_allow_html=True)
         st.dataframe(
             _tabela_detalhes_envio(reg),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             column_config={
                 "Campo": st.column_config.TextColumn("Campo", width="medium"),
@@ -842,15 +850,15 @@ if _sucesso:
         if st.button(
             f"➡️ Preencher próximo pedido ({fila_restante[0].get('numero_po_com_release')} · linha {fila_restante[0].get('numero_linha')})",
             type="primary",
-            use_container_width=True,
+            width="stretch",
         ):
             _avancar_fila_ou_resetar()
             st.rerun()
-        if st.button("🏠 Voltar à busca", use_container_width=True):
+        if st.button("🏠 Voltar à busca", width="stretch"):
             _resetar_fluxo()
             st.rerun()
     else:
-        if st.button("➕ Enviar outra resposta", type="primary", use_container_width=True):
+        if st.button("➕ Enviar outra resposta", type="primary", width="stretch"):
             _resetar_fluxo()
             st.rerun()
     st.stop()
@@ -873,7 +881,7 @@ with busca_cols[0]:
     )
 with busca_cols[1]:
     st.markdown("<div style='height:1.7rem'></div>", unsafe_allow_html=True)
-    if st.button("📦 Ver todos", use_container_width=True, key="btn_ver_todos"):
+    if st.button("📦 Ver todos", width="stretch", key="btn_ver_todos"):
         st.session_state.mostrar_todos = True
         st.session_state._linhas_cache = minhas_linhas
 
@@ -925,7 +933,7 @@ with col_lista:
             df_pedidos = _dataframe_pedidos(linhas_disponiveis)
             selecao = st.dataframe(
                 df_pedidos,
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 on_select="rerun",
                 selection_mode="multi-row",
@@ -967,7 +975,7 @@ with col_form:
         }
         if (linha["numero_po_com_release"], linha["numero_linha"]) not in permitidas:
             st.error("Este pedido não pertence ao seu código de fornecedor.")
-            if st.button("Limpar seleção", type="primary", use_container_width=True):
+            if st.button("Limpar seleção", type="primary", width="stretch"):
                 st.session_state.linha_selecionada = None
                 st.session_state.fila_pedidos = []
                 st.rerun()
@@ -1031,12 +1039,12 @@ with col_form:
 
                 col_limpar, col_enviar = st.columns([1, 2])
                 with col_limpar:
-                    limpar = st.form_submit_button("Limpar", use_container_width=True)
+                    limpar = st.form_submit_button("Limpar", width="stretch")
                 with col_enviar:
                     enviar = st.form_submit_button(
                         "✅ Enviar resposta",
                         type="primary",
-                        use_container_width=True,
+                        width="stretch",
                     )
 
             if limpar:
