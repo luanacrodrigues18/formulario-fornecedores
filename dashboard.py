@@ -435,7 +435,7 @@ with st.expander("⏰ Prazo para o fornecedor preencher o formulário", expanded
     with col_b:
         st.write("")
         st.write("")
-        if st.button("Salvar prazo", type="primary", use_container_width=True):
+        if st.button("Salvar prazo", type="primary", width="stretch"):
             try:
                 salvar_prazo(
                     preview,
@@ -449,7 +449,7 @@ with st.expander("⏰ Prazo para o fornecedor preencher o formulário", expanded
     with col_c:
         st.write("")
         st.write("")
-        if st.button("Remover prazo", use_container_width=True, disabled=not limite_atual):
+        if st.button("Remover prazo", width="stretch", disabled=not limite_atual):
             limpar_prazo()
             st.rerun()
 

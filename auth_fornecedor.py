@@ -267,10 +267,10 @@ def _render_tela_cadastro() -> None:
         cadastrar = st.form_submit_button(
             "Criar usuário e senha",
             type="primary",
-            use_container_width=True,
+            width="stretch",
         )
 
-    if st.button("Já tenho conta — ir para login", use_container_width=True):
+    if st.button("Já tenho conta — ir para login", width="stretch"):
         _ir_para("login")
 
     if not cadastrar:
@@ -344,14 +344,14 @@ def _render_tela_login_form() -> None:
             placeholder="Ex: compras.ars ou 123",
         )
         senha = st.text_input("Senha", type="password")
-        entrar = st.form_submit_button("Entrar", type="primary", use_container_width=True)
+        entrar = st.form_submit_button("Entrar", type="primary", width="stretch")
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Criar conta", use_container_width=True):
+        if st.button("Criar conta", width="stretch"):
             _ir_para("cadastro", codigo=_codigo_preferido())
     with c2:
-        if st.button("Redefinir senha", use_container_width=True, key="btn_ir_redefinir"):
+        if st.button("Redefinir senha", width="stretch", key="btn_ir_redefinir"):
             _ir_para("redefinir", codigo=_codigo_preferido())
 
     if not entrar:
@@ -416,10 +416,10 @@ def _render_tela_redefinir() -> None:
         salvar = st.form_submit_button(
             "Salvar nova senha",
             type="primary",
-            use_container_width=True,
+            width="stretch",
         )
 
-    if not forcar and st.button("Voltar para login", use_container_width=True, key="redefinir_voltar"):
+    if not forcar and st.button("Voltar para login", width="stretch", key="redefinir_voltar"):
         _ir_para("login", codigo=_codigo_preferido())
 
     if not salvar:
@@ -473,8 +473,8 @@ def _render_tela_2fa() -> None:
     )
     with st.form("form_2fa"):
         otp = st.text_input("Código de 6 dígitos")
-        ok = st.form_submit_button("Confirmar", type="primary", use_container_width=True)
-    if st.button("Cancelar", use_container_width=True):
+        ok = st.form_submit_button("Confirmar", type="primary", width="stretch")
+    if st.button("Cancelar", width="stretch"):
         logout()
         st.rerun()
     if not ok:
@@ -508,9 +508,9 @@ def _render_criar_senha_link(info: dict[str, str], po: str, linha: str) -> None:
         criar = st.form_submit_button(
             "Criar usuário e senha",
             type="primary",
-            use_container_width=True,
+            width="stretch",
         )
-    if st.button("Já tenho conta — login", use_container_width=True, key="link_ir_login"):
+    if st.button("Já tenho conta — login", width="stretch", key="link_ir_login"):
         _ir_para("login", codigo=info["codigo_fornecedor"])
     if not criar:
         return
@@ -554,7 +554,7 @@ def _render_entrar_com_senha_link(info: dict[str, str], po: str, linha: str) -> 
     )
     with st.form("login_senha_link_fornecedor"):
         senha = st.text_input("Senha", type="password")
-        entrar = st.form_submit_button("Entrar", type="primary", use_container_width=True)
+        entrar = st.form_submit_button("Entrar", type="primary", width="stretch")
     if st.button("Redefinir senha", key="link_redefinir"):
         _ir_para("redefinir", codigo=info["codigo_fornecedor"])
     if not entrar:
@@ -654,6 +654,6 @@ def render_tela_login() -> None:
 def render_resumo_sessao_sidebar() -> None:
     if not autenticado():
         return
-    if st.button("Sair", use_container_width=True, key="logout_fornecedor"):
+    if st.button("Sair", width="stretch", key="logout_fornecedor"):
         logout()
         st.rerun()

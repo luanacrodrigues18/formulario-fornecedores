@@ -263,6 +263,13 @@ def inserir_registro(dados: dict[str, Any]) -> dict[str, Any]:
         response = client.table(supabase_table()).insert(payload).execute()
     except Exception as exc:
         mensagem = str(exc)
+        if "42501" in mensagem or "row-level security" in mensagem.lower():
+            raise RuntimeError(
+                "Supabase bloqueou o insert (RLS). "
+                "No Streamlit Cloud, em Settings → Secrets, adicione "
+                "SUPABASE_SERVICE_ROLE_KEY (Settings → API no Supabase, chave service_role) "
+                "e faça Reboot do app. Não use só a chave anon."
+            ) from exc
         if "codigo_fornecedor" in mensagem and "codigo_fornecedor" in payload:
             payload.pop("codigo_fornecedor", None)
             response = client.table(supabase_table()).insert(payload).execute()
