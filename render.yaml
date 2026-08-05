@@ -1,0 +1,64 @@
+# Render Blueprint — Formulário + Dashboard
+# Docs: https://render.com/docs/blueprint-spec
+#
+# No painel: New → Blueprint → conecte este repo
+# Ou crie 2 Web Services manualmente com os startCommand abaixo.
+
+services:
+  - type: web
+    name: formulario-fornecedores
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --browser.gatherUsageStats=false
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_TABLE
+        value: formulario
+      - key: SUPABASE_STORAGE_BUCKET
+        value: Form
+      - key: SUPABASE_FUP_FILE
+        value: relatorio_fup.xlsm
+      - key: SUPABASE_CODIGOS_FILE
+        value: fornecedores_codigos.json
+      - key: SUPABASE_CONTAS_FILE
+        value: contas_fornecedor.json
+      - key: FORM_BASE_URL
+        sync: false
+
+  - type: web
+    name: dashboard-fornecedores
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run dashboard.py --server.port=$PORT --server.address=0.0.0.0 --browser.gatherUsageStats=false
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_TABLE
+        value: formulario
+      - key: SUPABASE_STORAGE_BUCKET
+        value: Form
+      - key: SUPABASE_FUP_FILE
+        value: relatorio_fup.xlsm
+      - key: SUPABASE_CODIGOS_FILE
+        value: fornecedores_codigos.json
+      - key: SUPABASE_CONTAS_FILE
+        value: contas_fornecedor.json
+      - key: SUPABASE_PRAZO_FILE
+        value: prazo_resposta.json
+      - key: FORM_BASE_URL
+        sync: false
