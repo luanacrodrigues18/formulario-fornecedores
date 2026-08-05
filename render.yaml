@@ -10,7 +10,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --browser.gatherUsageStats=false
+    startCommand: streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.8"
@@ -38,7 +38,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run dashboard.py --server.port=$PORT --server.address=0.0.0.0 --browser.gatherUsageStats=false
+    startCommand: streamlit run dashboard.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --browser.gatherUsageStats=false
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.8"

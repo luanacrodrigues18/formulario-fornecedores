@@ -705,56 +705,69 @@ def _aplicar_link_direto() -> None:
 
 _inicializar_estado()
 
-_pasta_app = Path(__file__).resolve().parent
-_fup_local = _pasta_app / "relatorio_fup.xlsm"
-if _fup_local.is_file():
-    planilha_mod.ARQUIVO_FUP = _fup_local
-else:
-    try:
-        garantir_arquivo_fup()
-    except Exception as exc:
-        mensagem = str(exc)
-        if "11001" in mensagem or "getaddrinfo" in mensagem.lower() or "name or service not known" in mensagem.lower():
+
+def _garantir_codigos() -> None:
+    _pasta = Path(__file__).resolve().parent
+    _codigos_local = _pasta / "fornecedores_codigos.json"
+    if not _codigos_local.is_file():
+        try:
+            garantir_arquivo_codigos()
+        except Exception as exc:
             st.error(
-                "Não foi possível conectar ao Supabase (rede da empresa pode bloquear). "
-                "Coloque o arquivo **relatorio_fup.xlsm** na pasta do projeto e reinicie o app."
+                "Cadastro de códigos de fornecedor não encontrado. "
+                f"Faça upload de **fornecedores_codigos.json** no bucket do Supabase Storage. "
+                f"Detalhe: {exc}"
             )
-        else:
-            st.error(f"Erro ao carregar planilha base: {exc}")
-        st.stop()
-
-if not planilha_mod.ARQUIVO_FUP.exists():
-    st.error(
-        f"Arquivo base não encontrado: {planilha_mod.ARQUIVO_FUP.name}. "
-        "Coloque o arquivo na pasta do projeto ou configure o Supabase Storage."
-    )
-    st.stop()
-
-try:
-    listar_fornecedores()
-except Exception as exc:
-    st.error(f"Erro ao ler a aba Follow-up-Release: {exc}")
-    st.stop()
-
-_codigos_local = _pasta_app / "fornecedores_codigos.json"
-if not _codigos_local.is_file():
-    try:
-        garantir_arquivo_codigos()
-    except Exception as exc:
+            st.stop()
+    if not planilha_mod.ARQUIVO_CODIGOS.is_file():
         st.error(
-            "Cadastro de códigos de fornecedor não encontrado. "
-            f"Faça upload de **fornecedores_codigos.json** no bucket do Supabase Storage. "
-            f"Detalhe: {exc}"
+            "Arquivo **fornecedores_codigos.json** não encontrado. "
+            "Gere com `python gerar_codigos_fornecedores.py` e coloque na pasta do projeto "
+            "ou faça upload no Supabase Storage."
         )
         st.stop()
 
-if not planilha_mod.ARQUIVO_CODIGOS.is_file():
-    st.error(
-        "Arquivo **fornecedores_codigos.json** não encontrado. "
-        "Gere com `python gerar_codigos_fornecedores.py` e coloque na pasta do projeto "
-        "ou faça upload no Supabase Storage."
-    )
-    st.stop()
+
+def _garantir_fup() -> None:
+    """Baixa/valida a FUP só quando necessário (após login ou link direto)."""
+    if st.session_state.get("_fup_pronta"):
+        return
+    _pasta = Path(__file__).resolve().parent
+    _fup_local = _pasta / "relatorio_fup.xlsm"
+    if _fup_local.is_file():
+        planilha_mod.ARQUIVO_FUP = _fup_local
+    else:
+        try:
+            garantir_arquivo_fup()
+        except Exception as exc:
+            mensagem = str(exc)
+            if (
+                "11001" in mensagem
+                or "getaddrinfo" in mensagem.lower()
+                or "name or service not known" in mensagem.lower()
+            ):
+                st.error(
+                    "Não foi possível conectar ao Supabase (rede da empresa pode bloquear). "
+                    "Coloque o arquivo **relatorio_fup.xlsm** na pasta do projeto e reinicie o app."
+                )
+            else:
+                st.error(f"Erro ao carregar planilha base: {exc}")
+            st.stop()
+
+    if not planilha_mod.ARQUIVO_FUP.exists():
+        st.error(
+            f"Arquivo base não encontrado: {planilha_mod.ARQUIVO_FUP.name}. "
+            "Coloque o arquivo na pasta do projeto ou configure o Supabase Storage."
+        )
+        st.stop()
+
+    try:
+        listar_fornecedores()
+    except Exception as exc:
+        st.error(f"Erro ao ler a aba Follow-up-Release: {exc}")
+        st.stop()
+    st.session_state._fup_pronta = True
+
 
 try:
     from contas_fornecedor import garantir_arquivo_contas
@@ -770,10 +783,19 @@ try:
 except Exception:
     texto_aviso_fornecedor = None  # type: ignore
 
+_garantir_codigos()
+
+_po_link = st.query_params.get("po", "").strip()
+_linha_link = st.query_params.get("linha", "").strip()
+if _po_link and _linha_link:
+    _garantir_fup()
+
 if not autenticado():
     _render_sidebar()
     render_tela_login()
     st.stop()
+
+_garantir_fup()
 
 _aplicar_link_direto()
 
