@@ -325,7 +325,7 @@ with col_titulo:
     st.title("📊 Dashboard de Fornecedores")
 with col_btn1:
     st.write("")
-    if st.button("🔄 Atualizar", type="primary", width="stretch"):
+    if st.button("🔄 Atualizar", type="primary", use_container_width=True):
         st.rerun()
 with col_btn2:
     st.write("")
@@ -443,7 +443,7 @@ with st.expander("⏰ Prazo para o fornecedor preencher o formulário", expanded
     with col_b:
         st.write("")
         st.write("")
-        if st.button("Salvar prazo", type="primary", width="stretch"):
+        if st.button("Salvar prazo", type="primary", use_container_width=True):
             try:
                 salvar_prazo(
                     preview,
@@ -457,7 +457,7 @@ with st.expander("⏰ Prazo para o fornecedor preencher o formulário", expanded
     with col_c:
         st.write("")
         st.write("")
-        if st.button("Remover prazo", width="stretch", disabled=not limite_atual):
+        if st.button("Remover prazo", use_container_width=True, disabled=not limite_atual):
             limpar_prazo()
             st.rerun()
 
@@ -467,11 +467,11 @@ if registros:
     with g1:
         st.subheader("Envios por dia (7 dias)")
         df_dias = grafico_envios_por_dia(registros)
-        st.altair_chart(_chart_envios_por_dia(df_dias), width="stretch")
+        st.altair_chart(_chart_envios_por_dia(df_dias), use_container_width=True)
     with g2:
         st.subheader("Top 10 fornecedores")
         df_top = grafico_top_fornecedores(registros)
-        st.altair_chart(_chart_top_fornecedores(df_top), width="stretch")
+        st.altair_chart(_chart_top_fornecedores(df_top), use_container_width=True)
 
 # ── Gerador de link ─────────────────────────────────────────────────────────
 with st.expander("🔗 Gerar link para fornecedor", expanded=False):
@@ -622,7 +622,7 @@ registros_pagina = registros_filtrados[inicio:fim]
 # ── Tabela ──────────────────────────────────────────────────────────────────
 if registros_pagina:
     df = registros_para_dataframe(registros_pagina)
-    st.dataframe(aplicar_destaque(df), width="stretch", hide_index=True)
+    st.dataframe(aplicar_destaque(df), use_container_width=True, hide_index=True)
 
     excel_bytes = gerar_excel(registros_filtrados)
     nome_arquivo = f"fornecedores_{agora.strftime('%Y%m%d_%H%M%S')}.xlsx"

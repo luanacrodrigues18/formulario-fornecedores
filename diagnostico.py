@@ -12,7 +12,7 @@ st.write(f"Streamlit: `{st.__version__}`")
 
 st.subheader("API de botão")
 try:
-    st.button("teste width=stretch", width="stretch", key="btn_width")
+    st.button("teste width=stretch", use_container_width=True, key="btn_width")
     st.success("width='stretch' OK")
 except TypeError as exc:
     st.warning(f"width não suportado: {exc}")
