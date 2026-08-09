@@ -3,5 +3,7 @@ supabase
 python-dotenv
 openpyxl
 pandas
-altair
+# Altair 5.5+ usa TypedDict(closed=...) e quebra no Python 3.14 do Streamlit Cloud
+altair==5.4.1
+typing_extensions>=4.12.2
 tzdata
