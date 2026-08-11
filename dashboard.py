@@ -6,7 +6,7 @@ from pathlib import Path
 import streamlit as st
 
 st.set_page_config(
-    page_title="Dashboard - Fornecedores",
+    page_title="Dashboard Alcoa - Fornecedores",
     page_icon="📊",
     layout="wide",
 )
@@ -273,6 +273,41 @@ def grafico_top_fornecedores(registros: list[dict]) -> pd.DataFrame:
     return top.sort_values("Envios", ascending=True)
 
 
+def grafico_status_prazo(registros: list[dict]) -> pd.DataFrame:
+    limite = data_limite_atual()
+    contagem: dict[str, int] = {}
+    for r in registros:
+        status = status_prazo_envio(r, limite) or "Sem data"
+        contagem[status] = contagem.get(status, 0) + 1
+    if not contagem:
+        return pd.DataFrame(columns=["Status", "Qtd"])
+    return pd.DataFrame(
+        {"Status": list(contagem.keys()), "Qtd": list(contagem.values())}
+    )
+
+
+def grafico_completude(registros: list[dict]) -> pd.DataFrame:
+    incompletos = sum(1 for r in registros if registro_incompleto(r))
+    completos = max(len(registros) - incompletos, 0)
+    return pd.DataFrame(
+        {
+            "Situação": ["Completos", "Incompletos (sem NF/obs)"],
+            "Qtd": [completos, incompletos],
+        }
+    )
+
+
+def grafico_envios_30_dias(registros: list[dict]) -> pd.DataFrame:
+    hoje = agora_brasil().date()
+    dias = [hoje - timedelta(days=i) for i in range(29, -1, -1)]
+    contagem = {d.strftime("%d/%m"): 0 for d in dias}
+    for registro in registros:
+        dt = _parse_datetime(registro.get("hora_conclusao"))
+        if dt and dt.date() in dias:
+            contagem[dt.strftime("%d/%m")] += 1
+    return pd.DataFrame({"Dia": list(contagem.keys()), "Envios": list(contagem.values())})
+
+
 def _chart_envios_por_dia(df: pd.DataFrame) -> alt.Chart:
     max_envios = max(df["Envios"].max(), 1)
     base = alt.Chart(df).encode(
@@ -322,10 +357,129 @@ def _chart_top_fornecedores(df: pd.DataFrame) -> alt.Chart:
     return (barras + rotulos).properties(height=altura)
 
 
+def _chart_pizza(df: pd.DataFrame, categoria: str, valor: str, titulo: str) -> alt.Chart:
+    if df.empty or df[valor].sum() == 0:
+        return (
+            alt.Chart(pd.DataFrame({"x": [0], "y": [0], "t": ["Sem dados"]}))
+            .mark_text(size=16, color="#64748b")
+            .encode(text="t:N")
+            .properties(height=280, title=titulo)
+        )
+    return (
+        alt.Chart(df)
+        .mark_arc(innerRadius=50)
+        .encode(
+            theta=alt.Theta(f"{valor}:Q", stack=True),
+            color=alt.Color(
+                f"{categoria}:N",
+                legend=alt.Legend(title=categoria),
+                scale=alt.Scale(scheme="blues"),
+            ),
+            tooltip=[
+                alt.Tooltip(f"{categoria}:N", title=categoria),
+                alt.Tooltip(f"{valor}:Q", title="Qtd"),
+            ],
+        )
+        .properties(height=280, title=titulo)
+    )
+
+
+def _chart_barras_periodo(df: pd.DataFrame) -> alt.Chart:
+    max_envios = max(int(df["Envios"].max() or 0), 1)
+    return (
+        alt.Chart(df)
+        .mark_bar(color="#2d5a8e", cornerRadiusTopLeft=2, cornerRadiusTopRight=2)
+        .encode(
+            x=alt.X("Dia:N", title="Dia", sort=None, axis=alt.Axis(labelAngle=-45)),
+            y=alt.Y(
+                "Envios:Q",
+                title="Envios",
+                scale=alt.Scale(domain=[0, max_envios * 1.15]),
+            ),
+            tooltip=["Dia", "Envios"],
+        )
+        .properties(height=280, title="Envios nos últimos 30 dias")
+    )
+
+
+def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
+    """Relatório PDF com métricas e resumos para reunião."""
+    from fpdf import FPDF
+
+    agora_local = agora_brasil()
+    limite = data_limite_atual()
+    contagem = contar_por_prazo(registros, limite)
+    incompletos = sum(1 for r in registros if registro_incompleto(r))
+    top = grafico_top_fornecedores(registros).sort_values("Envios", ascending=False)
+
+    def linha(pdf_obj: FPDF, texto: str, *, negrito: bool = False, tamanho: int = 11) -> None:
+        pdf_obj.set_font("Helvetica", "B" if negrito else "", tamanho)
+        pdf_obj.cell(0, 7 if tamanho <= 11 else 9, texto, new_x="LMARGIN", new_y="NEXT")
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    linha(pdf, "Relatorio Dashboard - Fornecedores Alcoa", negrito=True, tamanho=16)
+    linha(
+        pdf,
+        f"Gerado em: {agora_local.strftime('%d/%m/%Y %H:%M')} (Brasilia)",
+    )
+    pdf.ln(3)
+
+    linha(pdf, "Resumo geral", negrito=True, tamanho=13)
+    linhas_resumo = [
+        f"Total de retornos: {len(registros)}",
+        f"Envios hoje: {contar_envios_hoje(registros)}",
+        f"Ultimos 7 dias: {contar_envios_semana(registros)}",
+        f"Sem Numero da NF: {contar_sem_nf(registros)}",
+        f"Incompletos (sem NF ou observacao): {incompletos}",
+    ]
+    ultimo_dt = ultimo_envio(registros)
+    if ultimo_dt:
+        linhas_resumo.append(f"Ultimo envio: {ultimo_dt.strftime('%d/%m/%Y %H:%M')}")
+    if limite:
+        linhas_resumo.append(f"Data limite do form: {limite.strftime('%d/%m/%Y')}")
+        linhas_resumo.append(f"No prazo: {contagem.get('No prazo', 0)}")
+        linhas_resumo.append(f"Atrasado: {contagem.get('Atrasado', 0)}")
+    for item in linhas_resumo:
+        linha(pdf, item)
+
+    pdf.ln(3)
+    linha(pdf, "Status do prazo", negrito=True, tamanho=13)
+    df_prazo = grafico_status_prazo(registros)
+    if df_prazo.empty:
+        linha(pdf, "Sem dados de prazo.")
+    else:
+        for _, row in df_prazo.iterrows():
+            linha(pdf, f"- {row['Status']}: {int(row['Qtd'])}")
+
+    pdf.ln(3)
+    linha(pdf, "Top fornecedores (por retornos)", negrito=True, tamanho=13)
+    if top.empty:
+        linha(pdf, "Sem dados.")
+    else:
+        for _, row in top.head(10).iterrows():
+            nome = str(row["Fornecedor"])[:70]
+            # Helvetica core font: evita caracteres fora de latin-1
+            nome_safe = nome.encode("latin-1", errors="replace").decode("latin-1")
+            linha(pdf, f"- {nome_safe}: {int(row['Envios'])}")
+
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.multi_cell(
+        0,
+        5,
+        "Documento gerado automaticamente pelo painel de fornecedores. "
+        "Use junto com o Excel de retorno quando precisar do detalhe por PO/linha.",
+    )
+
+    out = pdf.output()
+    return bytes(out) if isinstance(out, (bytes, bytearray)) else bytes(out)
+
 # ── Cabeçalho ───────────────────────────────────────────────────────────────
 col_titulo, col_btn1, col_btn2 = st.columns([4, 1, 1])
 with col_titulo:
-    st.title("📊 Painel Alcoa — Fornecedores")
+    st.title("📊 Painel Alcoa -Fornecedores")
 with col_btn1:
     st.write("")
     if st.button("🔄 Atualizar", type="primary", use_container_width=True):
@@ -397,6 +551,22 @@ with aba_dash:
         p2.metric("Retornos atrasados", contagem_prazo.get("Atrasado", 0))
         p3.metric("Data limite do form", limite_atual.strftime("%d/%m/%Y"))
 
+    col_pdf, _ = st.columns([1, 3])
+    with col_pdf:
+        try:
+            pdf_bytes = gerar_pdf_relatorio(registros)
+            st.download_button(
+                "📄 Exportar relatório PDF",
+                data=pdf_bytes,
+                file_name=f"relatorio_fornecedores_{agora.strftime('%Y%m%d_%H%M')}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                type="primary",
+                key="dl_pdf_relatorio",
+            )
+        except Exception as exc:
+            st.warning(f"PDF indisponível: {exc}")
+
     if registros:
         g1, g2 = st.columns(2)
         with g1:
@@ -407,6 +577,26 @@ with aba_dash:
             st.subheader("Top 10 fornecedores")
             df_top = grafico_top_fornecedores(registros)
             st.altair_chart(_chart_top_fornecedores(df_top), use_container_width=True)
+
+        g3, g4 = st.columns(2)
+        with g3:
+            st.subheader("Status do prazo")
+            df_prazo = grafico_status_prazo(registros)
+            st.altair_chart(
+                _chart_pizza(df_prazo, "Status", "Qtd", "Distribuição por prazo"),
+                use_container_width=True,
+            )
+        with g4:
+            st.subheader("Completude do retorno")
+            df_comp = grafico_completude(registros)
+            st.altair_chart(
+                _chart_pizza(df_comp, "Situação", "Qtd", "Completos x incompletos"),
+                use_container_width=True,
+            )
+
+        st.subheader("Tendência (30 dias)")
+        df_30 = grafico_envios_30_dias(registros)
+        st.altair_chart(_chart_barras_periodo(df_30), use_container_width=True)
     else:
         st.info("Nenhum registro ainda para exibir gráficos.")
 
@@ -432,7 +622,7 @@ with aba_tabela:
             obs_atual = (cfg or {}).get("observacao") or ""
             st.info(
                 f"Prazo atual: **{limite_atual.strftime('%d/%m/%Y')}**"
-                + (f" — {obs_atual}" if obs_atual else "")
+                + (f" -{obs_atual}" if obs_atual else "")
             )
 
         modo = st.radio(
