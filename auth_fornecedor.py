@@ -387,15 +387,12 @@ def _render_tela_login_form() -> None:
         senha = st.text_input("Senha", type="password")
         entrar = st.form_submit_button("Entrar", type="primary", use_container_width=True)
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     with c1:
         if st.button("Criar conta", use_container_width=True):
             _ir_para("cadastro", codigo=_codigo_preferido())
     with c2:
-        if st.button("Alterar senha", use_container_width=True, key="btn_ir_alterar"):
-            _ir_para("redefinir", codigo=_codigo_preferido())
-    with c3:
-        if st.button("Esqueci a senha", use_container_width=True, key="btn_ir_esqueci"):
+        if st.button("Esqueci / alterar senha", use_container_width=True, key="btn_ir_esqueci"):
             _ir_para("esqueci", codigo=_codigo_preferido())
 
     if not entrar:
@@ -432,12 +429,19 @@ def _render_tela_login_form() -> None:
 
 
 def _render_tela_redefinir() -> None:
+    """Só usada na troca obrigatória (senha expirada) — ainda exige senha atual."""
     forcar = bool(st.session_state.get("forcar_troca_senha"))
+    if not forcar:
+        # Alterar senha sem estar logado = recuperação por e-mail (sem senha atual)
+        _ir_para("esqueci", codigo=_codigo_preferido() or codigo_atual())
+        return
+
     st.markdown(
-        f"""
+        """
         <div class="login-box">
-            <h2>🔄 {"Troca obrigatória de senha" if forcar else "Alterar senha"}</h2>
-            <p>{"Informe a senha atual e a nova senha (mín. 8, letra e número)." if forcar else "Se você <strong>lembra</strong> a senha atual, altere abaixo. Se <strong>esqueceu</strong>, use a recuperação por e-mail."}</p>
+            <h2>🔄 Troca obrigatória de senha</h2>
+            <p>Sua senha expirou. Informe a <strong>senha atual</strong>
+            e a <strong>nova senha</strong> (mín. 8, letra e número).</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -446,16 +450,6 @@ def _render_tela_redefinir() -> None:
     if st.session_state.get("auth_msg"):
         st.warning(st.session_state.auth_msg)
         st.session_state.pop("auth_msg", None)
-
-    if not forcar:
-        if st.button(
-            "🔑 Não sei a senha atual — recuperar por e-mail",
-            type="primary",
-            use_container_width=True,
-            key="alterar_ir_esqueci",
-        ):
-            _ir_para("esqueci", codigo=_codigo_preferido() or codigo_atual())
-        st.caption("Ou, se ainda lembrar a senha atual:")
 
     with st.form("form_redefinir_senha"):
         codigo = st.text_input(
@@ -468,12 +462,9 @@ def _render_tela_redefinir() -> None:
         confirmar = st.text_input("Confirmar nova senha", type="password")
         salvar = st.form_submit_button(
             "Salvar nova senha",
-            type="primary" if forcar else "secondary",
+            type="primary",
             use_container_width=True,
         )
-
-    if not forcar and st.button("Voltar para login", use_container_width=True, key="redefinir_voltar"):
-        _ir_para("login", codigo=_codigo_preferido())
 
     if not salvar:
         return
@@ -503,14 +494,8 @@ def _render_tela_redefinir() -> None:
         return
 
     st.session_state.pop("forcar_troca_senha", None)
-    if forcar:
-        _concluir_login(info)
-        st.rerun()
-    _ir_para(
-        "login",
-        msg="Senha redefinida com sucesso! Entre com a nova senha.",
-        codigo=info["codigo_fornecedor"],
-    )
+    _concluir_login(info)
+    st.rerun()
 
 
 def _enviar_otp_reset(conta: dict, info: dict[str, str]) -> None:
@@ -542,9 +527,10 @@ def _render_tela_esqueci() -> None:
     st.markdown(
         """
         <div class="login-box">
-            <h2>🔑 Esqueci a senha</h2>
+            <h2>🔑 Esqueci / alterar senha</h2>
             <p>Enviaremos um <strong>código de 6 dígitos</strong> para o e-mail
-            cadastrado na sua conta. Depois você define a nova senha.</p>
+            cadastrado. Com ele você define a <strong>nova senha</strong>
+            — <strong>não precisa</strong> da senha atual.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -813,10 +799,8 @@ def _render_entrar_com_senha_link(info: dict[str, str], po: str, linha: str) -> 
     with st.form("login_senha_link_fornecedor"):
         senha = st.text_input("Senha", type="password")
         entrar = st.form_submit_button("Entrar", type="primary", use_container_width=True)
-    if st.button("Esqueci a senha", key="link_esqueci"):
+    if st.button("Esqueci / alterar senha", key="link_esqueci"):
         _ir_para("esqueci", codigo=info["codigo_fornecedor"])
-    if st.button("Alterar senha", key="link_alterar"):
-        _ir_para("redefinir", codigo=info["codigo_fornecedor"])
     if not entrar:
         return
     conta = obter_conta(info["codigo_fornecedor"])
