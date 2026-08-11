@@ -43,6 +43,11 @@ try:
         salvar_prazo,
         status_prazo_envio,
     )
+    from contas_fornecedor import (
+        garantir_arquivo_contas,
+        obter_conta_por_login,
+        redefinir_senha_admin,
+    )
 except Exception as exc:
     st.error("Falha ao iniciar o dashboard (importação).")
     st.code(f"{type(exc).__name__}: {exc}")
@@ -496,6 +501,61 @@ with st.expander("🔗 Gerar link para fornecedor", expanded=False):
             st.caption(f"Pedido encontrado no FUP: **{fornecedor}** — copie o link e envie por e-mail.")
         else:
             st.warning("PO/linha não encontrados no FUP. Verifique os dados antes de enviar o link.")
+
+# ── Reset de senha (equipe Alcoa — sem e-mail/domínio) ───────────────────────
+with st.expander("🔑 Reset de senha do fornecedor (equipe)", expanded=False):
+    st.markdown(
+        """
+        Use quando o fornecedor **esqueceu a senha** e o e-mail automático não está disponível.
+        Gere uma senha temporária e envie pelo **Teams / telefone**.
+        """
+    )
+    try:
+        garantir_arquivo_contas()
+    except Exception:
+        pass
+
+    with st.form("form_reset_senha_admin"):
+        login_reset = st.text_input(
+            "Usuário ou código Alcoa",
+            placeholder="Ex: compras.ars ou 123",
+        )
+        senha_manual = st.text_input(
+            "Nova senha (opcional)",
+            type="password",
+            help="Deixe em branco para o sistema gerar uma senha temporária.",
+        )
+        confirmar_reset = st.form_submit_button(
+            "Redefinir senha",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if confirmar_reset:
+        if not str(login_reset or "").strip():
+            st.error("Informe o usuário ou código do fornecedor.")
+        else:
+            try:
+                conta_antes = obter_conta_por_login(login_reset)
+                conta_ok, senha_plain = redefinir_senha_admin(
+                    login_reset,
+                    nova_senha=senha_manual or None,
+                )
+                st.success(
+                    f"Senha redefinida para **{conta_ok.get('fornecedor', '')}** "
+                    f"(código **{conta_ok.get('codigo_fornecedor', '')}**"
+                    f"{', usuário **' + str(conta_ok.get('usuario') or '') + '**' if conta_ok.get('usuario') else ''})."
+                )
+                st.info(
+                    f"Senha temporária (passe ao fornecedor e peça para trocar no próximo acesso):\n\n"
+                    f"`{senha_plain}`"
+                )
+                if conta_antes and conta_antes.get("email"):
+                    st.caption(f"E-mail cadastrado: {conta_antes.get('email')}")
+            except ValueError as exc:
+                st.error(str(exc))
+            except Exception as exc:
+                st.error(f"Erro ao redefinir: {exc}")
 
 # ── Exportar retorno (sem alterar o .xlsm) ───────────────────────────────────
 with st.expander("📥 Exportar retorno para Excel (sem mexer na FUP)", expanded=False):

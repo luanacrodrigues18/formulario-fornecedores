@@ -429,6 +429,56 @@ def redefinir_senha(
     return _gravar_conta(conta)
 
 
+def gerar_senha_temporaria(tamanho: int = 10) -> str:
+    """Senha temporária com letras e números (atende validar_forca_senha)."""
+    import string
+
+    letras = string.ascii_letters
+    digitos = string.digits
+    # Garante ao menos 1 letra e 1 número
+    chars = [
+        secrets.choice(letras),
+        secrets.choice(digitos),
+    ]
+    alfabeto = letras + digitos
+    chars.extend(secrets.choice(alfabeto) for _ in range(max(tamanho, 8) - 2))
+    # Embaralha
+    for i in range(len(chars) - 1, 0, -1):
+        j = secrets.randbelow(i + 1)
+        chars[i], chars[j] = chars[j], chars[i]
+    return "".join(chars)
+
+
+def redefinir_senha_admin(
+    login_ou_codigo: str,
+    *,
+    nova_senha: str | None = None,
+) -> tuple[dict[str, Any], str]:
+    """
+    Reset pela equipe Alcoa (dashboard).
+    Retorna (conta_atualizada, senha_em_claro).
+    """
+    conta = obter_conta_por_login(login_ou_codigo)
+    if not conta:
+        raise ValueError("Conta não encontrada para este usuário/código.")
+    senha = (nova_senha or "").strip() or gerar_senha_temporaria()
+    erro = validar_forca_senha(senha)
+    if erro:
+        raise ValueError(erro)
+    atualizada = redefinir_senha(
+        conta["codigo_fornecedor"],
+        senha,
+        via_otp=True,
+    )
+    registrar_acesso(
+        conta["codigo_fornecedor"],
+        "senha_redefinida_admin",
+        fornecedor=str(conta.get("fornecedor", "")),
+        detalhes=f"usuario={conta.get('usuario', '')}",
+    )
+    return atualizada, senha
+
+
 def atualizar_email(codigo_fornecedor: str, email: str) -> dict[str, Any]:
     conta = obter_conta(codigo_fornecedor)
     if not conta:
