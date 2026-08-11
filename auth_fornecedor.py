@@ -537,7 +537,7 @@ def _render_tela_esqueci() -> None:
     )
 
     if not smtp_configurado():
-                st.warning(
+        st.warning(
             "Recuperação por e-mail indisponível no momento "
             "(configure RESEND_API_KEY + EMAIL_FROM, ou SMTP). "
             "Contate a equipe Alcoa."
