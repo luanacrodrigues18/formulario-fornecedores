@@ -402,42 +402,100 @@ def _chart_barras_periodo(df: pd.DataFrame) -> alt.Chart:
     )
 
 
-def _pdf_simples_texto(linhas: list[str]) -> bytes:
-    """Gera PDF texto mínimo sem dependências externas (fallback)."""
+def _pdf_safe(texto: str) -> str:
+    """Helvetica/latin-1: acentos do PT-BR ok; demais caracteres viram '?'."""
+    return str(texto).encode("latin-1", errors="replace").decode("latin-1")
+
+
+def _pdf_dados_relatorio(registros: list[dict]) -> dict:
+    agora_local = agora_brasil()
+    limite = data_limite_atual()
+    contagem = contar_por_prazo(registros, limite)
+    incompletos = sum(1 for r in registros if registro_incompleto(r))
+    top = grafico_top_fornecedores(registros).sort_values("Envios", ascending=False)
+    df_prazo = grafico_status_prazo(registros)
+    ultimo_dt = ultimo_envio(registros)
+    return {
+        "agora": agora_local,
+        "limite": limite,
+        "contagem": contagem,
+        "incompletos": incompletos,
+        "top": top,
+        "df_prazo": df_prazo,
+        "ultimo": ultimo_dt,
+        "total": len(registros),
+        "hoje": contar_envios_hoje(registros),
+        "semana": contar_envios_semana(registros),
+        "sem_nf": contar_sem_nf(registros),
+    }
+
+
+def _pdf_simples_texto(dados: dict) -> bytes:
+    """Fallback texto se fpdf2 nao estiver disponivel."""
 
     def esc(s: str) -> str:
-        return (
-            s.replace("\\", "\\\\")
-            .replace("(", "\\(")
-            .replace(")", "\\)")
-        )
+        return _pdf_safe(s).replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
-    y = 800
-    content_lines = ["BT", "/F1 11 Tf"]
+    linhas = [
+        "Relatorio Dashboard - Fornecedores Alcoa",
+        f"Gerado em: {dados['agora'].strftime('%d/%m/%Y %H:%M')} (Brasilia)",
+        "",
+        "Resumo geral",
+        f"Total de retornos: {dados['total']}",
+        f"Envios hoje: {dados['hoje']}",
+        f"Ultimos 7 dias: {dados['semana']}",
+        f"Sem Numero da NF: {dados['sem_nf']}",
+        f"Incompletos: {dados['incompletos']}",
+    ]
+    if dados["ultimo"]:
+        linhas.append(f"Ultimo envio: {dados['ultimo'].strftime('%d/%m/%Y %H:%M')}")
+    if dados["limite"]:
+        linhas.append(f"Data limite: {dados['limite'].strftime('%d/%m/%Y')}")
+        linhas.append(f"No prazo: {dados['contagem'].get('No prazo', 0)}")
+        linhas.append(f"Atrasado: {dados['contagem'].get('Atrasado', 0)}")
+
+    linhas.extend(["", "Status do prazo"])
+    df_prazo = dados["df_prazo"]
+    if df_prazo.empty:
+        linhas.append("Sem dados de prazo.")
+    else:
+        for _, row in df_prazo.iterrows():
+            linhas.append(f"- {row['Status']}: {int(row['Qtd'])}")
+
+    linhas.extend(["", "Top fornecedores"])
+    top = dados["top"]
+    if top.empty:
+        linhas.append("Sem dados.")
+    else:
+        for _, row in top.head(10).iterrows():
+            linhas.append(f"- {str(row['Fornecedor'])[:70]}: {int(row['Envios'])}")
+
+    y = 780
+    content = ["BT", "/F1 11 Tf", "50 780 Td"]
+    first = True
     for raw in linhas:
-        texto = esc(str(raw).encode("latin-1", errors="replace").decode("latin-1"))
-        content_lines.append(f"50 {y} Td ({texto}) Tj")
-        content_lines.append("0 -16 Td")
-        y -= 16
+        if not first:
+            content.append("0 -15 Td")
+            y -= 15
+        first = False
         if y < 50:
             break
-    content_lines.append("ET")
-    stream = "\n".join(content_lines).encode("latin-1", errors="replace")
+        content.append(f"({esc(raw)}) Tj")
+    content.append("ET")
+    stream = "\n".join(content).encode("latin-1", errors="replace")
 
-    objs: list[bytes] = []
-    objs.append(b"1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n")
-    objs.append(b"2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj\n")
-    objs.append(
-        b"3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
-        b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj\n"
-    )
-    objs.append(
+    objs: list[bytes] = [
+        b"1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n",
+        b"2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj\n",
+        (
+            b"3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj\n"
+        ),
         f"4 0 obj<< /Length {len(stream)} >>stream\n".encode("ascii")
         + stream
-        + b"\nendstream endobj\n"
-    )
-    objs.append(b"5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n")
-
+        + b"\nendstream endobj\n",
+        b"5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n",
+    ]
     out = bytearray(b"%PDF-1.4\n")
     offsets = [0]
     for obj in objs:
@@ -456,92 +514,234 @@ def _pdf_simples_texto(linhas: list[str]) -> bytes:
     return bytes(out)
 
 
-def _montar_linhas_relatorio(registros: list[dict]) -> list[str]:
-    agora_local = agora_brasil()
-    limite = data_limite_atual()
-    contagem = contar_por_prazo(registros, limite)
-    incompletos = sum(1 for r in registros if registro_incompleto(r))
-    top = grafico_top_fornecedores(registros).sort_values("Envios", ascending=False)
-
-    linhas = [
-        "Relatorio Dashboard - Fornecedores Alcoa",
-        f"Gerado em: {agora_local.strftime('%d/%m/%Y %H:%M')} (Brasilia)",
-        "",
-        "Resumo geral",
-        f"Total de retornos: {len(registros)}",
-        f"Envios hoje: {contar_envios_hoje(registros)}",
-        f"Ultimos 7 dias: {contar_envios_semana(registros)}",
-        f"Sem Numero da NF: {contar_sem_nf(registros)}",
-        f"Incompletos (sem NF ou observacao): {incompletos}",
-    ]
-    ultimo_dt = ultimo_envio(registros)
-    if ultimo_dt:
-        linhas.append(f"Ultimo envio: {ultimo_dt.strftime('%d/%m/%Y %H:%M')}")
-    if limite:
-        linhas.append(f"Data limite do form: {limite.strftime('%d/%m/%Y')}")
-        linhas.append(f"No prazo: {contagem.get('No prazo', 0)}")
-        linhas.append(f"Atrasado: {contagem.get('Atrasado', 0)}")
-
-    linhas.extend(["", "Status do prazo"])
-    df_prazo = grafico_status_prazo(registros)
-    if df_prazo.empty:
-        linhas.append("Sem dados de prazo.")
-    else:
-        for _, row in df_prazo.iterrows():
-            linhas.append(f"- {row['Status']}: {int(row['Qtd'])}")
-
-    linhas.extend(["", "Top fornecedores (por retornos)"])
-    if top.empty:
-        linhas.append("Sem dados.")
-    else:
-        for _, row in top.head(10).iterrows():
-            nome = str(row["Fornecedor"])[:70]
-            linhas.append(f"- {nome}: {int(row['Envios'])}")
-
-    linhas.extend(
-        [
-            "",
-            "Documento gerado automaticamente pelo painel de fornecedores.",
-        ]
-    )
-    return linhas
-
-
 def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
-    """Relatório PDF com métricas e resumos para reunião."""
-    linhas = _montar_linhas_relatorio(registros)
+    """Relatório PDF formatado (métricas, tabelas e rodapé) para reunião."""
+    dados = _pdf_dados_relatorio(registros)
     try:
         from fpdf import FPDF
+    except Exception:
+        return _pdf_simples_texto(dados)
 
-        def escrever(pdf_obj: FPDF, texto: str, *, negrito: bool = False, tamanho: int = 11) -> None:
-            pdf_obj.set_font("Helvetica", "B" if negrito else "", tamanho)
-            safe = texto.encode("latin-1", errors="replace").decode("latin-1")
-            pdf_obj.cell(
+    AZUL = (30, 58, 95)       # #1e3a5f
+    AZUL_CLARO = (238, 244, 251)
+    CINZA = (100, 116, 139)
+    CINZA_LINHA = (226, 232, 240)
+    VERDE = (22, 101, 52)
+    VERMELHO = (153, 27, 27)
+    BRANCO = (255, 255, 255)
+    PRETO = (15, 23, 42)
+
+    class RelatorioPDF(FPDF):
+        def header(self) -> None:
+            self.set_fill_color(*AZUL)
+            self.rect(0, 0, 210, 28, "F")
+            self.set_xy(14, 8)
+            self.set_text_color(*BRANCO)
+            self.set_font("Helvetica", "B", 16)
+            self.cell(0, 8, _pdf_safe("Painel Alcoa - Fornecedores"), align="L")
+            self.set_xy(14, 16)
+            self.set_font("Helvetica", "", 9)
+            self.cell(0, 6, _pdf_safe("Relatorio de metricas e retornos"), align="L")
+            self.set_y(34)
+
+        def footer(self) -> None:
+            self.set_y(-14)
+            self.set_draw_color(*CINZA_LINHA)
+            self.line(14, self.get_y(), 196, self.get_y())
+            self.set_y(-12)
+            self.set_font("Helvetica", "", 8)
+            self.set_text_color(*CINZA)
+            self.cell(
                 0,
-                7 if tamanho <= 11 else 9,
-                safe,
+                8,
+                _pdf_safe(
+                    f"Gerado em {dados['agora'].strftime('%d/%m/%Y %H:%M')} (Brasilia)  |  Pagina {self.page_no()}"
+                ),
+                align="C",
+            )
+
+    def secao(pdf: RelatorioPDF, titulo: str) -> None:
+        pdf.ln(3)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_text_color(*AZUL)
+        pdf.cell(0, 8, _pdf_safe(titulo), new_x="LMARGIN", new_y="NEXT")
+        pdf.set_draw_color(*AZUL)
+        pdf.set_line_width(0.4)
+        y = pdf.get_y()
+        pdf.line(14, y, 196, y)
+        pdf.ln(3)
+
+    def kpi_box(pdf: RelatorioPDF, x: float, y: float, w: float, h: float, label: str, valor: str, cor_valor=AZUL) -> None:
+        pdf.set_fill_color(*AZUL_CLARO)
+        pdf.set_draw_color(*CINZA_LINHA)
+        pdf.set_line_width(0.2)
+        pdf.rect(x, y, w, h, "FD")
+        pdf.set_xy(x + 2, y + 2)
+        pdf.set_font("Helvetica", "", 7)
+        pdf.set_text_color(*CINZA)
+        pdf.cell(w - 4, 4, _pdf_safe(label), align="C")
+        pdf.set_xy(x + 2, y + 8)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_text_color(*cor_valor)
+        pdf.cell(w - 4, 8, _pdf_safe(valor), align="C")
+
+    def tabela(pdf: RelatorioPDF, headers: list[str], rows: list[list[str]], col_widths: list[float]) -> None:
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(*AZUL)
+        pdf.set_text_color(*BRANCO)
+        for i, h in enumerate(headers):
+            pdf.cell(col_widths[i], 7, _pdf_safe(h), border=0, fill=True, align="C" if i else "L")
+        pdf.ln()
+        pdf.set_font("Helvetica", "", 9)
+        for idx, row in enumerate(rows):
+            if pdf.get_y() > 270:
+                pdf.add_page()
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_fill_color(*AZUL)
+                pdf.set_text_color(*BRANCO)
+                for i, h in enumerate(headers):
+                    pdf.cell(col_widths[i], 7, _pdf_safe(h), border=0, fill=True, align="C" if i else "L")
+                pdf.ln()
+                pdf.set_font("Helvetica", "", 9)
+            fill = idx % 2 == 0
+            if fill:
+                pdf.set_fill_color(248, 250, 252)
+            else:
+                pdf.set_fill_color(*BRANCO)
+            pdf.set_text_color(*PRETO)
+            for i, cell in enumerate(row):
+                align = "C" if i else "L"
+                pdf.cell(col_widths[i], 6.5, _pdf_safe(cell), border=0, fill=True, align=align)
+            pdf.ln()
+
+    try:
+        pdf = RelatorioPDF(orientation="P", unit="mm", format="A4")
+        pdf.set_auto_page_break(auto=True, margin=18)
+        pdf.set_margins(14, 14, 14)
+        pdf.add_page()
+
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(*CINZA)
+        pdf.cell(
+            0,
+            6,
+            _pdf_safe(
+                f"Documento para reuniao · {dados['agora'].strftime('%d/%m/%Y %H:%M')} (horario de Brasilia)"
+            ),
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
+
+        secao(pdf, "1. Resumo geral")
+        y0 = pdf.get_y()
+        box_w, box_h, gap = 35.5, 18, 2.5
+        kpis = [
+            ("Total de retornos", str(dados["total"]), AZUL),
+            ("Envios hoje", str(dados["hoje"]), AZUL),
+            ("Ultimos 7 dias", str(dados["semana"]), AZUL),
+            ("Sem Numero da NF", str(dados["sem_nf"]), VERMELHO if dados["sem_nf"] else AZUL),
+            ("Incompletos", str(dados["incompletos"]), VERMELHO if dados["incompletos"] else VERDE),
+        ]
+        for i, (lab, val, cor) in enumerate(kpis):
+            kpi_box(pdf, 14 + i * (box_w + gap), y0, box_w, box_h, lab, val, cor)
+        pdf.set_y(y0 + box_h + 4)
+
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(*PRETO)
+        if dados["ultimo"]:
+            pdf.cell(
+                0,
+                5,
+                _pdf_safe(f"Ultimo envio: {dados['ultimo'].strftime('%d/%m/%Y %H:%M')}"),
+                new_x="LMARGIN",
+                new_y="NEXT",
+            )
+        if dados["limite"]:
+            pdf.cell(
+                0,
+                5,
+                _pdf_safe(f"Data limite do formulario: {dados['limite'].strftime('%d/%m/%Y')}"),
                 new_x="LMARGIN",
                 new_y="NEXT",
             )
 
-        pdf = FPDF()
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.add_page()
-        for i, item in enumerate(linhas):
-            if i == 0:
-                escrever(pdf, item, negrito=True, tamanho=16)
-            elif item in {"Resumo geral", "Status do prazo", "Top fornecedores (por retornos)"}:
-                pdf.ln(2)
-                escrever(pdf, item, negrito=True, tamanho=13)
-            elif item == "":
-                pdf.ln(2)
-            else:
-                escrever(pdf, item)
+        secao(pdf, "2. Status do prazo")
+        if dados["limite"]:
+            y1 = pdf.get_y()
+            kpi_box(
+                pdf,
+                14,
+                y1,
+                58,
+                18,
+                "No prazo",
+                str(dados["contagem"].get("No prazo", 0)),
+                VERDE,
+            )
+            kpi_box(
+                pdf,
+                76,
+                y1,
+                58,
+                18,
+                "Atrasado",
+                str(dados["contagem"].get("Atrasado", 0)),
+                VERMELHO,
+            )
+            kpi_box(
+                pdf,
+                138,
+                y1,
+                58,
+                18,
+                "Data limite",
+                dados["limite"].strftime("%d/%m/%Y"),
+                AZUL,
+            )
+            pdf.set_y(y1 + 22)
+
+        df_prazo = dados["df_prazo"]
+        if df_prazo.empty:
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.set_text_color(*CINZA)
+            pdf.cell(0, 6, _pdf_safe("Sem dados de prazo para exibir."), new_x="LMARGIN", new_y="NEXT")
+        else:
+            rows_prazo = [[str(r["Status"]), str(int(r["Qtd"]))] for _, r in df_prazo.iterrows()]
+            tabela(pdf, ["Status", "Quantidade"], rows_prazo, [140, 42])
+
+        secao(pdf, "3. Top 10 fornecedores (por retornos)")
+        top = dados["top"]
+        if top.empty:
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.set_text_color(*CINZA)
+            pdf.cell(0, 6, _pdf_safe("Sem dados de fornecedores."), new_x="LMARGIN", new_y="NEXT")
+        else:
+            rows_top = []
+            for i, (_, row) in enumerate(top.head(10).iterrows(), start=1):
+                nome = str(row["Fornecedor"])[:55]
+                rows_top.append([str(i), nome, str(int(row["Envios"]))])
+            tabela(pdf, ["#", "Fornecedor", "Retornos"], rows_top, [12, 140, 30])
+
+        pdf.ln(6)
+        pdf.set_fill_color(*AZUL_CLARO)
+        pdf.set_draw_color(*CINZA_LINHA)
+        pdf.rect(14, pdf.get_y(), 182, 14, "FD")
+        pdf.set_xy(16, pdf.get_y() + 3)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*CINZA)
+        pdf.multi_cell(
+            178,
+            4,
+            _pdf_safe(
+                "Documento gerado automaticamente pelo painel de fornecedores Alcoa. "
+                "Use este arquivo em reunioes de acompanhamento e follow-up."
+            ),
+        )
+
         out = pdf.output()
         return bytes(out) if isinstance(out, (bytes, bytearray)) else bytes(out)
     except Exception:
-        # Cloud sem fpdf2 instalado ainda, ou falha de fonte: fallback puro
-        return _pdf_simples_texto(linhas)
+        return _pdf_simples_texto(dados)
 
 
 # ── Cabeçalho ───────────────────────────────────────────────────────────────
