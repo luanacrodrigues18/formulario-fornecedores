@@ -6,4 +6,4 @@ pandas>=2.0,<3
 # 5.4.0/5.4.1 são bloqueados pelo Streamlit; 5.5+ quebra no Python 3.14
 altair==5.3.0
 tzdata
-fpdf2
+fpdf2>=2.8.0

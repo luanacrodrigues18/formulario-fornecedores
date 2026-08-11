@@ -402,32 +402,72 @@ def _chart_barras_periodo(df: pd.DataFrame) -> alt.Chart:
     )
 
 
-def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
-    """Relatório PDF com métricas e resumos para reunião."""
-    from fpdf import FPDF
+def _pdf_simples_texto(linhas: list[str]) -> bytes:
+    """Gera PDF texto mínimo sem dependências externas (fallback)."""
 
+    def esc(s: str) -> str:
+        return (
+            s.replace("\\", "\\\\")
+            .replace("(", "\\(")
+            .replace(")", "\\)")
+        )
+
+    y = 800
+    content_lines = ["BT", "/F1 11 Tf"]
+    for raw in linhas:
+        texto = esc(str(raw).encode("latin-1", errors="replace").decode("latin-1"))
+        content_lines.append(f"50 {y} Td ({texto}) Tj")
+        content_lines.append("0 -16 Td")
+        y -= 16
+        if y < 50:
+            break
+    content_lines.append("ET")
+    stream = "\n".join(content_lines).encode("latin-1", errors="replace")
+
+    objs: list[bytes] = []
+    objs.append(b"1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n")
+    objs.append(b"2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj\n")
+    objs.append(
+        b"3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj\n"
+    )
+    objs.append(
+        f"4 0 obj<< /Length {len(stream)} >>stream\n".encode("ascii")
+        + stream
+        + b"\nendstream endobj\n"
+    )
+    objs.append(b"5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n")
+
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for obj in objs:
+        offsets.append(len(out))
+        out.extend(obj)
+    xref_pos = len(out)
+    out.extend(f"xref\n0 {len(objs) + 1}\n".encode("ascii"))
+    out.extend(b"0000000000 65535 f \n")
+    for off in offsets[1:]:
+        out.extend(f"{off:010d} 00000 n \n".encode("ascii"))
+    out.extend(
+        f"trailer<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF\n".encode(
+            "ascii"
+        )
+    )
+    return bytes(out)
+
+
+def _montar_linhas_relatorio(registros: list[dict]) -> list[str]:
     agora_local = agora_brasil()
     limite = data_limite_atual()
     contagem = contar_por_prazo(registros, limite)
     incompletos = sum(1 for r in registros if registro_incompleto(r))
     top = grafico_top_fornecedores(registros).sort_values("Envios", ascending=False)
 
-    def linha(pdf_obj: FPDF, texto: str, *, negrito: bool = False, tamanho: int = 11) -> None:
-        pdf_obj.set_font("Helvetica", "B" if negrito else "", tamanho)
-        pdf_obj.cell(0, 7 if tamanho <= 11 else 9, texto, new_x="LMARGIN", new_y="NEXT")
-
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
-    linha(pdf, "Relatorio Dashboard - Fornecedores Alcoa", negrito=True, tamanho=16)
-    linha(
-        pdf,
+    linhas = [
+        "Relatorio Dashboard - Fornecedores Alcoa",
         f"Gerado em: {agora_local.strftime('%d/%m/%Y %H:%M')} (Brasilia)",
-    )
-    pdf.ln(3)
-
-    linha(pdf, "Resumo geral", negrito=True, tamanho=13)
-    linhas_resumo = [
+        "",
+        "Resumo geral",
         f"Total de retornos: {len(registros)}",
         f"Envios hoje: {contar_envios_hoje(registros)}",
         f"Ultimos 7 dias: {contar_envios_semana(registros)}",
@@ -436,45 +476,73 @@ def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
     ]
     ultimo_dt = ultimo_envio(registros)
     if ultimo_dt:
-        linhas_resumo.append(f"Ultimo envio: {ultimo_dt.strftime('%d/%m/%Y %H:%M')}")
+        linhas.append(f"Ultimo envio: {ultimo_dt.strftime('%d/%m/%Y %H:%M')}")
     if limite:
-        linhas_resumo.append(f"Data limite do form: {limite.strftime('%d/%m/%Y')}")
-        linhas_resumo.append(f"No prazo: {contagem.get('No prazo', 0)}")
-        linhas_resumo.append(f"Atrasado: {contagem.get('Atrasado', 0)}")
-    for item in linhas_resumo:
-        linha(pdf, item)
+        linhas.append(f"Data limite do form: {limite.strftime('%d/%m/%Y')}")
+        linhas.append(f"No prazo: {contagem.get('No prazo', 0)}")
+        linhas.append(f"Atrasado: {contagem.get('Atrasado', 0)}")
 
-    pdf.ln(3)
-    linha(pdf, "Status do prazo", negrito=True, tamanho=13)
+    linhas.extend(["", "Status do prazo"])
     df_prazo = grafico_status_prazo(registros)
     if df_prazo.empty:
-        linha(pdf, "Sem dados de prazo.")
+        linhas.append("Sem dados de prazo.")
     else:
         for _, row in df_prazo.iterrows():
-            linha(pdf, f"- {row['Status']}: {int(row['Qtd'])}")
+            linhas.append(f"- {row['Status']}: {int(row['Qtd'])}")
 
-    pdf.ln(3)
-    linha(pdf, "Top fornecedores (por retornos)", negrito=True, tamanho=13)
+    linhas.extend(["", "Top fornecedores (por retornos)"])
     if top.empty:
-        linha(pdf, "Sem dados.")
+        linhas.append("Sem dados.")
     else:
         for _, row in top.head(10).iterrows():
             nome = str(row["Fornecedor"])[:70]
-            # Helvetica core font: evita caracteres fora de latin-1
-            nome_safe = nome.encode("latin-1", errors="replace").decode("latin-1")
-            linha(pdf, f"- {nome_safe}: {int(row['Envios'])}")
+            linhas.append(f"- {nome}: {int(row['Envios'])}")
 
-    pdf.ln(5)
-    pdf.set_font("Helvetica", "I", 9)
-    pdf.multi_cell(
-        0,
-        5,
-        "Documento gerado automaticamente pelo painel de fornecedores. "
-        "Use junto com o Excel de retorno quando precisar do detalhe por PO/linha.",
+    linhas.extend(
+        [
+            "",
+            "Documento gerado automaticamente pelo painel de fornecedores.",
+        ]
     )
+    return linhas
 
-    out = pdf.output()
-    return bytes(out) if isinstance(out, (bytes, bytearray)) else bytes(out)
+
+def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
+    """Relatório PDF com métricas e resumos para reunião."""
+    linhas = _montar_linhas_relatorio(registros)
+    try:
+        from fpdf import FPDF
+
+        def escrever(pdf_obj: FPDF, texto: str, *, negrito: bool = False, tamanho: int = 11) -> None:
+            pdf_obj.set_font("Helvetica", "B" if negrito else "", tamanho)
+            safe = texto.encode("latin-1", errors="replace").decode("latin-1")
+            pdf_obj.cell(
+                0,
+                7 if tamanho <= 11 else 9,
+                safe,
+                new_x="LMARGIN",
+                new_y="NEXT",
+            )
+
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+        for i, item in enumerate(linhas):
+            if i == 0:
+                escrever(pdf, item, negrito=True, tamanho=16)
+            elif item in {"Resumo geral", "Status do prazo", "Top fornecedores (por retornos)"}:
+                pdf.ln(2)
+                escrever(pdf, item, negrito=True, tamanho=13)
+            elif item == "":
+                pdf.ln(2)
+            else:
+                escrever(pdf, item)
+        out = pdf.output()
+        return bytes(out) if isinstance(out, (bytes, bytearray)) else bytes(out)
+    except Exception:
+        # Cloud sem fpdf2 instalado ainda, ou falha de fonte: fallback puro
+        return _pdf_simples_texto(linhas)
+
 
 # ── Cabeçalho ───────────────────────────────────────────────────────────────
 col_titulo, col_btn1, col_btn2 = st.columns([4, 1, 1])
