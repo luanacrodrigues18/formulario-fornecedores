@@ -168,11 +168,11 @@
   <section class="slide">
     <h2>Funcionalidades</h2>
     <div class="grid-3">
-      <div class="card"><h3>Cadastro e login</h3><p>Usuário + senha; código Alcoa da empresa.</p></div>
+      <div class="card"><h3>Cadastro e login</h3><p>Usuário + senha + e-mail; código Alcoa da empresa.</p></div>
       <div class="card"><h3>Página única</h3><p>Busca, lista e envio lado a lado.</p></div>
       <div class="card"><h3>ALUX</h3><p>Dicas e FAQ na sidebar.</p></div>
-      <div class="card"><h3>Vários pedidos</h3><p>Seleção múltipla e fila de preenchimento.</p></div>
-      <div class="card"><h3>Dashboard</h3><p>Filtros, export e retorno FUP auxiliar.</p></div>
+      <div class="card"><h3>Dashboard</h3><p>Período (7/15 dias, mês), gráficos e PDF.</p></div>
+      <div class="card"><h3>Reset de senha</h3><p>Equipe gera temporária; fornecedor redefine.</p></div>
       <div class="card"><h3>Supabase</h3><p>Banco (contas, logs, respostas) + Storage.</p></div>
     </div>
   </section>
@@ -196,21 +196,22 @@
     <h2>Autenticação</h2>
     <ul>
       <li><code>fornecedores_codigos.json</code> mapeia código Alcoa → nome do fornecedor.</li>
-      <li>Conta: usuário + senha (hash) em <code>contas_fornecedor</code>.</li>
+      <li>Conta: usuário + senha (hash) + e-mail em <code>contas_fornecedor</code>.</li>
       <li>Na nuvem: FUP e JSON no Storage; app com <code>service_role</code> e RLS fechado.</li>
-      <li>Vários envios permitidos (mesmo PO + linha gera novo registro).</li>
+      <li>Esqueceu a senha (MVP): dashboard gera senha temporária → fornecedor redefine.</li>
+      <li>OTP por e-mail: código pronto; validação completa em produção (domínio / TI).</li>
     </ul>
   </section>
 
   <section class="slide">
     <h2>Dashboard Alcoa</h2>
     <ul>
-      <li>Todos os envios em tempo real</li>
+      <li>Filtro de período: dia, 7 dias, 15 dias, mês, personalizado</li>
+      <li>Métricas e gráficos alinhados ao período</li>
+      <li>Relatório PDF formatado (KPIs, pendências, top 10)</li>
       <li>Filtros por fornecedor, PO, data e status</li>
-      <li>Top 10 fornecedores (gráfico)</li>
-      <li>Exportação Excel formatada</li>
-      <li>Export retorno FUP (auxiliar, sem mexer no .xlsm)</li>
-      <li>Links diretos para o formulário</li>
+      <li>Exportação Excel e retorno FUP (sem mexer no .xlsm)</li>
+      <li>Aba Reset senha de fornecedor</li>
     </ul>
   </section>
 
@@ -267,19 +268,20 @@ Equipe Alcoa → dashboard.py</div>
       </div>
     </div>
     <ul style="margin-top:1.25rem">
-      <li>Secrets: SUPABASE_URL, SUPABASE_KEY, SUPABASE_STORAGE_BUCKET</li>
+      <li>Secrets: SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_ROLE_KEY, Storage</li>
       <li>Storage: relatorio_fup.xlsm + fornecedores_codigos.json</li>
+      <li>Docs: MAPA_DOCUMENTACAO.md · GUIA_IMPLANTACAO.md · DEPLOY_PRODUCAO.md</li>
     </ul>
   </section>
 
   <section class="slide">
     <h2>Próximos passos</h2>
     <ul>
-      <li>Tabela fornecedores no Supabase</li>
-      <li>SSO / Azure AD</li>
+      <li>Validar OTP / troca de senha por e-mail (domínio DNS + Resend/SMTP)</li>
+      <li>Tabela fornecedores no Supabase (IDs estáveis)</li>
+      <li>SSO / Azure AD no dashboard</li>
       <li>Integração SAP</li>
-      <li>Notificações por e-mail</li>
-      <li>RLS fechado com service_role (já no MVP)</li>
+      <li>Domínio corporativo *.alcoa.com.br</li>
     </ul>
   </section>
 

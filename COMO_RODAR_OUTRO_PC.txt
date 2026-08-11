@@ -2,6 +2,10 @@
   FORMULÁRIO DE FORNECEDORES — COMO RODAR EM OUTRO PC (Windows Alcoa)
 ================================================================================
 
+Índice de documentação (repasse / replicação):  MAPA_DOCUMENTACAO.md
+Implantação MVP:  GUIA_IMPLANTACAO.md
+Produção + e-mail OTP:  DEPLOY_PRODUCAO.md
+
 Caminho de rede (já configurado no projeto — caminhos_rede_alcoa.bat):
   \\noa.alcoa.com\dfs\PGH\InfoShare1\GSS_PMO\AA_Static\116_PSC_PO_Followup\Alumar-operação\Vitoria
 
@@ -15,6 +19,7 @@ Scripts prontos:
   setup_outro_pc.bat          → cria venv e instala Python packages
   rodar_formulario.bat
   rodar_dashboard.bat
+  INICIAR.bat                 → menu (formulário / dashboard)
 
 IMPORTANTE
 ----------
@@ -25,7 +30,7 @@ IMPORTANTE
    A) Duplo clique em mapear_rede_alcoa.bat
    B) Duplo clique em copiar_rede_para_local.bat
    C) Em C:\Projetos\FormularioFornecedores rode setup_outro_pc.bat
-   D) Depois rodar_formulario.bat
+   D) Depois rodar_formulario.bat ou INICIAR.bat
 
 3) Python PRECISA existir no PC (instalado pela TI ou portátil — ver abaixo).
 
@@ -37,12 +42,12 @@ Copie da pasta do projeto (GitHub / seu PC) para a pasta da rede:
 
   Obrigatórios (código):
     app.py, dashboard.py, database.py, planilha.py, alcoano.py
-    auth_fornecedor.py
-    gerar_codigos_fornecedores.py
-    requirements.txt
-    .env.example
-    .streamlit\config.toml
-    fornecedores_codigos.json.example
+    auth_fornecedor.py, contas_fornecedor.py, email_smtp.py
+    prazo_resposta.py, gerar_codigos_fornecedores.py
+    requirements.txt, .env.example, sql/fechar_rls.sql
+    .streamlit\config.toml, fornecedores_codigos.json.example
+    MAPA_DOCUMENTACAO.md, GUIA_IMPLANTACAO.md, DEPLOY_PRODUCAO.md
+    LEIA_PRIMEIRO.txt, INICIAR.bat
 
   Dados (NÃO vão no Git — coloque na pasta local ou na rede com cuidado):
     .env                         (copiar de .env.example e preencher)
@@ -51,7 +56,7 @@ Copie da pasta do projeto (GitHub / seu PC) para a pasta da rede:
     (contas ficam no Supabase: contas_fornecedor)
 
   Opcional:
-    README.md, GUIA_IMPLANTACAO.md, APRESENTACAO.html
+    README.md, APRESENTACAO.html, roadmap_mvp_producao.html
     setup_outro_pc.bat, rodar_formulario.bat, rodar_dashboard.bat
 
 

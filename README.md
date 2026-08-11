@@ -1,20 +1,44 @@
 # Formulário de Fornecedores
 
-Sistema em Python com **Streamlit** e **Supabase** para coleta de retorno de fornecedores: cadastro com usuário e senha, formulário em página única, dashboard interno e exportação para Excel.
+Sistema em Python com **Streamlit** e **Supabase** para coleta de retorno de fornecedores: cadastro com usuário e senha, formulário em página única, dashboard interno (métricas, período, PDF) e exportação para Excel.
+
+> **Repasse / replicação:** comece pelo [MAPA_DOCUMENTACAO.md](MAPA_DOCUMENTACAO.md).  
+> **MVP passo a passo:** [GUIA_IMPLANTACAO.md](GUIA_IMPLANTACAO.md).  
+> **Produção (Azure, e-mail OTP, Docker…):** [DEPLOY_PRODUCAO.md](DEPLOY_PRODUCAO.md).
 
 ## Funcionalidades
 
-- **Cadastro** - o fornecedor cria **usuário** + **senha** + **e-mail** (vinculado ao código Alcoa da empresa)
-- **Login** - entra com **usuário ou código Alcoa** + senha
-- **Alterar senha** - exige a senha atual
-- **Esqueci a senha** - código OTP enviado por e-mail (SMTP) para definir nova senha
-- Formulário em **página única** (busca + lista + formulário lado a lado)
+### Formulário (`app.py`)
+
+- **Cadastro** — usuário + senha + e-mail + código Alcoa da empresa
+- **Login** — usuário ou código Alcoa + senha
+- **Alterar senha** — exige a senha atual
+- **Esqueci a senha (MVP)** — o fornecedor usa a **senha temporária** gerada pela equipe no dashboard e define a senha definitiva
+- Formulário em **página única** (busca + lista + formulário)
 - Seleção de **vários pedidos** e preenchimento em sequência
 - Assistente **ALUX** (dicas e FAQ na sidebar)
-- Dashboard interno para filtrar, exportar e gerar retorno FUP (sem alterar o `.xlsm`)
+
+### Dashboard (`dashboard.py`) — uso interno Alcoa
+
+- Três abas: **métricas**, **filtros/tabela**, **reset de senha**
+- **Filtro de período:** hoje, ontem, 7 dias, 15 dias, mês atual/anterior, personalizado ou todo o histórico
+- Métricas e gráficos alinhados ao período (prazo, completude, top 10, envios)
+- **Exportar relatório PDF** formatado (KPIs, envios no período, pendências sem NF/obs)
+- Exportação Excel e **retorno FUP** (sem alterar o `.xlsm`)
+- **Reset senha de fornecedor:** gera senha temporária → passa por Teams/telefone → fornecedor troca em “Esqueci a senha”
+
+### Dados e segurança
+
 - Contas e logs no Supabase (`contas_fornecedor`, `acessos_log`)
 - Respostas na tabela `formulario`
-- Geração de IDs a partir da planilha FUP (`fornecedores_codigos.json`)
+- RLS fechado + `SUPABASE_SERVICE_ROLE_KEY` ([`sql/fechar_rls.sql`](sql/fechar_rls.sql))
+- Geração de IDs a partir da FUP (`fornecedores_codigos.json`)
+
+### E-mail / OTP (código pronto; validar em produção)
+
+O módulo [`email_smtp.py`](email_smtp.py) já fala com **Resend** ou **SMTP**. No MVP o fluxo principal de recuperação **não depende** de e-mail (usa reset no dashboard).
+
+A **validação completa de troca de senha por e-mail** (OTP no inbox do fornecedor) fica para **produção**, porque depende de domínio DNS, remetente aprovado, política de spam e Secrets — ver [DEPLOY_PRODUCAO.md](DEPLOY_PRODUCAO.md#validação-troca-de-senha-por-e-mail-produção).
 
 ## Requisitos
 
@@ -54,22 +78,20 @@ FORM_BASE_URL=http://localhost:8501
 ```
 
 - **anon (`SUPABASE_KEY`)**: chave pública (Settings → API).
-- **service_role (`SUPABASE_SERVICE_ROLE_KEY`)**: chave secreta do servidor - **nunca** publique no Git nem no front. Necessária com o RLS fechado (`sql/fechar_rls.sql`).
+- **service_role (`SUPABASE_SERVICE_ROLE_KEY`)**: chave secreta do servidor — **nunca** no Git. Necessária com RLS fechado.
 
 No Streamlit Cloud, use as mesmas chaves em **Secrets**.
 
-Para **Esqueci a senha**, configure e-mail nos Secrets / `.env` (uma das opções):
+### E-mail (opcional no MVP; obrigatório se for OTP em produção)
 
-**Resend (recomendado — só API key):**
+**Resend (recomendado):**
 ```toml
 RESEND_API_KEY = "re_xxxxx"
-EMAIL_FROM = "onboarding@resend.dev"
+EMAIL_FROM = "onboarding@resend.dev"   # teste; em produção use domínio verificado
 ```
 
-**Ou SMTP (Outlook/Gmail):**
+**Ou SMTP:**
 `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TLS`.
-
-Sem isso, o botão avisa que a recuperação está indisponível.
 
 ## Criar tabelas no Supabase
 
@@ -130,11 +152,9 @@ ALTER TABLE acessos_log ENABLE ROW LEVEL SECURITY;
 
 ### Fechar o RLS (recomendado)
 
-Depois de configurar `SUPABASE_SERVICE_ROLE_KEY`, rode o script [`sql/fechar_rls.sql`](sql/fechar_rls.sql). Ele remove políticas públicas abertas. O app acessa as tabelas só pelo servidor com a `service_role`.
+Com `SUPABASE_SERVICE_ROLE_KEY` configurada, rode [`sql/fechar_rls.sql`](sql/fechar_rls.sql).
 
 ## Login e contas
-
-A FUP tem o **nome** do fornecedor, mas **não tem ID**. O isolamento usa:
 
 ```
 Código Alcoa  →  fornecedores_codigos.json  →  Nome na FUP
@@ -149,11 +169,12 @@ Código Alcoa  →  fornecedores_codigos.json  →  Nome na FUP
 | Recurso | Detalhe |
 |---------|---------|
 | Senha forte | Mínimo 8 caracteres, com letra e número |
-| Hash | PBKDF2 - senha não fica em texto puro |
+| Hash | PBKDF2 — senha não fica em texto puro |
 | Bloqueio | Após falhas de login (padrão: 5 / 15 min) |
 | Rotação | Troca obrigatória após 90 dias (configurável) |
 | Alterar senha | Exige senha atual |
-| Esqueci a senha | OTP por e-mail (requer SMTP) |
+| Esqueci a senha (MVP) | Senha temporária gerada no dashboard |
+| Esqueci a senha (produção) | OTP / e-mail — validar com domínio e provedor |
 | RLS | Fechado com `fechar_rls.sql` + `service_role` |
 | HTTPS | Streamlit Cloud |
 
@@ -170,43 +191,36 @@ python gerar_codigos_fornecedores.py
 | `fornecedores_codigos.json` | Mapa `ID → nome` |
 | `fornecedores_codigos_lista.txt` | Lista para conferência |
 
-Esses arquivos **não vão para o Git**. Contas novas preferem a tabela Supabase; há fallback local em `contas_fornecedor.json`.
+Esses arquivos **não vão para o Git**.
 
 ### 2. Fluxo do fornecedor
 
 1. Abre o formulário (ou o link `?po=...&linha=...`).
-2. **Cadastro:** cria **usuário** + **senha** + informa o **código Alcoa** da empresa.
-3. **Login:** entra com **usuário ou código** + senha.
-4. Busca pedidos / Ver todos → marca na lista → preenche e envia.
+2. **Cadastro:** usuário + senha + e-mail + código Alcoa.
+3. **Login:** usuário ou código + senha.
+4. Busca / Ver todos → marca → preenche e envia.
 5. A resposta grava `codigo_fornecedor` na tabela `formulario`.
 
-### 3. Exemplo do JSON de códigos
+### 3. Fluxo de reset de senha (MVP)
 
-```json
-{
-  "1": "A C NETO COMERCIO E REPRESENTACAO TECNICA EIRELI",
-  "6": "ACOS VITAL COMERCIO DE TUBOS HIDRAULICOS EIRELI"
-}
-```
-
-O **nome** precisa ser **igual** ao da coluna `FORNECEDOR` na FUP.
+1. Equipe Alcoa abre o **dashboard** → aba **Reset senha de fornecedor**.
+2. Busca a conta e gera **senha temporária**.
+3. Passa a senha ao fornecedor (Teams / telefone).
+4. Fornecedor em **Esqueci a senha** informa a temporária e define a nova.
+5. Se a conta estiver marcada para troca forçada, o próximo login exige nova senha.
 
 ### 4. Na nuvem (Streamlit Cloud)
 
-Upload no bucket **Form** (Storage):
+Upload no bucket **Form**:
 
 | Arquivo | Nome no Storage |
 |---------|-----------------|
 | Planilha FUP | `relatorio_fup.xlsm` |
 | Cadastro de IDs | `fornecedores_codigos.json` |
 
-Secrets mínimos: `SUPABASE_URL`, `SUPABASE_KEY`, **`SUPABASE_SERVICE_ROLE_KEY`**, bucket e nomes dos arquivos. Prefira bucket **privado**.
+Secrets mínimos: `SUPABASE_URL`, `SUPABASE_KEY`, **`SUPABASE_SERVICE_ROLE_KEY`**, bucket e nomes dos arquivos.
 
 ## Como executar
-
-> **Deploy passo a passo (do zero):** comece pelo checklist em [GUIA_IMPLANTACAO.md](GUIA_IMPLANTACAO.md).  
-> **Produção (Azure, AWS, Docker…):** [DEPLOY_PRODUCAO.md](DEPLOY_PRODUCAO.md)  
-> **Outro PC Alcoa (sem terminal):** [LEIA_PRIMEIRO.txt](LEIA_PRIMEIRO.txt) / `INICIAR.bat`
 
 ### Formulário
 
@@ -223,7 +237,12 @@ streamlit run app.py
 streamlit run dashboard.py
 ```
 
-No dashboard: **Exportar retorno para Excel (sem mexer na FUP)** gera um `.xlsx` com chaves PO+linha e campos de retorno, **sem gravar** no `.xlsm`.
+No dashboard:
+
+- Escolha o **período** (7 / 15 dias, mês, personalizado…)
+- **Exportar relatório PDF** (respeita o período)
+- **Exportar retorno para Excel (sem mexer na FUP)**
+- Aba **Reset senha de fornecedor**
 
 ### Atalhos Windows
 
@@ -255,18 +274,22 @@ mapear_rede_alcoa.bat    # mapeia V: na pasta InfoShare
 projeto/
 ├── app.py                          # Formulário + fluxo
 ├── auth_fornecedor.py              # Cadastro, login, alterar / esqueci senha
-├── contas_fornecedor.py            # Contas, hash, bloqueio, logs
+├── contas_fornecedor.py            # Contas, hash, bloqueio, reset admin, logs
 ├── database.py                     # Supabase (service_role) + validações
 ├── planilha.py                     # Leitura FUP / export retorno
 ├── alcoano.py                      # ALUX (dicas / FAQ)
-├── email_smtp.py                   # SMTP (esqueci senha / 2FA)
+├── email_smtp.py                   # Resend / SMTP (OTP em produção)
+├── prazo_resposta.py               # Prazo do formulário
 ├── sql/fechar_rls.sql              # Fecha políticas públicas
-├── dashboard.py                    # Dashboard + export retorno FUP
+├── dashboard.py                    # Dashboard + PDF + período + reset senha
 ├── gerar_codigos_fornecedores.py
-├── INICIAR.bat
-├── LEIA_PRIMEIRO.txt
+├── MAPA_DOCUMENTACAO.md            # Índice para repasse
 ├── GUIA_IMPLANTACAO.md
 ├── DEPLOY_PRODUCAO.md
+├── roadmap_mvp_producao.html
+├── APRESENTACAO.html
+├── LEIA_PRIMEIRO.txt
+├── INICIAR.bat
 ├── .env.example
 ├── requirements.txt
 └── README.md
@@ -277,7 +300,6 @@ projeto/
 - `hora_inicio` e `hora_conclusao` são preenchidos automaticamente.
 - Campos obrigatórios do envio: e-mail, nome, PO com Release, data da promessa e número da linha.
 - Vários envios são permitidos (inclusive para o mesmo PO + linha).
-- Na lista, é possível marcar vários pedidos e preenchê-los em sequência.
 - Pedidos duplicados idênticos na FUP (mesmo PO + linha) aparecem só uma vez na lista.
-- CNPJ como login ainda não está na FUP; evolução futura possível.
 - Após atualizar a FUP: `python gerar_codigos_fornecedores.py`.
+- Dependência de PDF: `fpdf2` (já em `requirements.txt`; há fallback se o pacote faltar).

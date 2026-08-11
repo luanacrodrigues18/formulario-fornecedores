@@ -1,8 +1,10 @@
 # Opções de deploy para produção real
 
-Documento de referência para evoluir o **Formulário de Fornecedores** do MVP (Streamlit Cloud + Supabase gratuito) para um **ambiente de produção corporativo**, com segurança, controle e sustentabilidade.
+Documento de referência para evoluir o **Formulário de Fornecedores** do MVP (Streamlit Cloud + Supabase) para um **ambiente de produção corporativo**, com segurança, controle e sustentabilidade.
 
-> Para o passo a passo do MVP já implementado, veja **[GUIA_IMPLANTACAO.md](GUIA_IMPLANTACAO.md)**.
+> **MVP já implementado:** [GUIA_IMPLANTACAO.md](GUIA_IMPLANTACAO.md)  
+> **Índice de docs:** [MAPA_DOCUMENTACAO.md](MAPA_DOCUMENTACAO.md)  
+> **Roadmap visual:** [roadmap_mvp_producao.html](roadmap_mvp_producao.html)
 
 ---
 
@@ -12,10 +14,10 @@ Este sistema tem **5 peças** que podem ser hospedadas de formas diferentes:
 
 | Peça | Tecnologia atual | Função |
 |---|---|---|
-| **Formulário público** | `app.py` + `auth_fornecedor.py` | Cadastro/login (usuário + senha) + envio |
-| **Dashboard interno** | `dashboard.py` (Streamlit) | Uso da equipe Alcoa |
-| **Banco de respostas** | Supabase (PostgreSQL) | Armazena envios (`formulario`) |
-| **Cadastro de IDs** | `fornecedores_codigos.json` | Mapa `ID → nome` (passo 1) |
+| **Formulário público** | `app.py` + `auth_fornecedor.py` | Cadastro/login + envio |
+| **Dashboard interno** | `dashboard.py` | Métricas, período, PDF, reset senha, export |
+| **Banco de respostas** | Supabase (PostgreSQL) | `formulario`, contas, logs |
+| **Cadastro de IDs** | `fornecedores_codigos.json` | Mapa `ID → nome` |
 | **Arquivo FUP** | `relatorio_fup.xlsm` | Consulta de PO, linha e fornecedor |
 
 Em produção real, além de “subir o app”, normalmente se exige:
@@ -27,6 +29,7 @@ Em produção real, além de “subir o app”, normalmente se exige:
 - Backup e retenção de dados
 - Logs e monitoramento
 - Política de segurança (RLS, firewall, rede)
+- **E-mail corporativo** para OTP / recuperação de senha (domínio verificado)
 - SLA e suporte interno
 
 ---
@@ -378,8 +381,10 @@ O **formulário** é público, mas exige **cadastro/login** (usuário + senha vi
 
 | Camada | Onde | Status |
 |--------|------|--------|
-| **Usuário + senha** (hash, bloqueio, rotação) | Formulário | Feito |
+| **Usuário + senha** (hash, bloqueio, rotação) | Formulário | Feito (MVP) |
 | **Código Alcoa** (isolamento por empresa) | `fornecedores_codigos.json` | Feito |
+| **Reset admin** (senha temporária) | Dashboard → aba Reset senha | Feito (MVP) |
+| **OTP / e-mail** para recuperação | `email_smtp.py` | Código pronto — **validar em produção** |
 | **RLS fechado + service_role** | Supabase | Feito (`sql/fechar_rls.sql`) |
 | **streamlit-authenticator** | Dashboard (opcional) | Baixo esforço |
 
@@ -398,7 +403,71 @@ O **dashboard** não deve ser público.
 
 **Mínimo aceitável em produção:**  
 - Formulário: cadastro/login + `codigo_fornecedor` no banco + RLS fechado  
-- Dashboard: restringir URL / VPN / SSO (MVP atual: acesso interno; não divulgar URL)
+- Dashboard: restringir URL / VPN / SSO (MVP atual: acesso interno; não divulgar URL)  
+- Recuperação de senha: preferir **e-mail OTP** após a validação abaixo; manter reset admin como fallback
+
+---
+
+## 12.1 Validação: troca de senha por e-mail (produção)
+
+No **MVP**, o fornecedor recupera a senha assim:
+
+1. Equipe gera **senha temporária** no dashboard  
+2. Passa por Teams / telefone  
+3. Fornecedor usa **Esqueci a senha** e define a senha definitiva  
+
+Isso funciona **sem** depender de DNS, antispam ou provedor de e-mail.
+
+Em **produção**, o desejável é o fornecedor receber **OTP ou senha temporária no e-mail** cadastrado. O código de envio já existe em [`email_smtp.py`](email_smtp.py) (Resend ou SMTP). A validação completa **depende de vários fatores externos** — por isso fica nesta documentação de produção, não no piloto.
+
+### Por que não basta “ligar a API key” no MVP
+
+| Fator | O que acontece se faltar |
+|---|---|
+| **Domínio / DNS** (SPF, DKIM, DMARC) | E-mail cai em spam ou é rejeitado |
+| **Remetente verificado** (`EMAIL_FROM`) | Resend free só envia para o e-mail da conta; domínio `alcoa.com` exige TI |
+| **Firewall corporativo** | SMTP de saída bloqueado |
+| **Segredo no Cloud** | App sobe sem `RESEND_API_KEY` / SMTP → envio falha |
+| **Caixa do fornecedor** | Políticas de spam / lista de bloqueio |
+| **LGPD / comunicação** | Texto do e-mail e retenção precisam de alinhamento |
+
+### Pré-requisitos (checklist TI)
+
+- [ ] Domínio de envio aprovado (ex.: `noreply@fornecedores.alcoa.com.br` ou provedor aprovado)
+- [ ] Registros DNS (SPF / DKIM / DMARC) publicados
+- [ ] Conta Resend (ou SMTP corporativo Exchange/Office 365) liberada
+- [ ] Secrets no ambiente de produção:
+  - Resend: `RESEND_API_KEY`, `EMAIL_FROM`
+  - ou SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TLS`
+- [ ] E-mail obrigatório e válido no cadastro do fornecedor (já exigido no formulário)
+- [ ] Plano de fallback: se o e-mail falhar, equipe ainda usa **reset no dashboard**
+
+### Roteiro de validação (homologação → produção)
+
+1. **Homologação com domínio de teste**  
+   Configure Resend com remetente de teste ou domínio de sandbox. Envie um e-mail de prova para um endereço controlado pela equipe.
+2. **Confirmar entrega**  
+   Inbox (não só spam). Conteúdo legível (código OTP / instruções / validade).
+3. **Fluxo ponta a ponta**  
+   Fornecedor de teste solicita recuperação → recebe e-mail → informa OTP/temporária → define nova senha → faz login.
+4. **Falhas controladas**  
+   Sem e-mail na conta → mensagem clara. OTP expirado → mensagem clara. Provedor fora → erro amigável + orientar contato com a Alcoa (reset dashboard).
+5. **Produção**  
+   Trocar `EMAIL_FROM` para domínio corporativo verificado. Registrar na runbook: “se e-mail falhar, usar aba Reset senha”.
+6. **Monitoramento**  
+   Log de eventos em `acessos_log`. Alerta se taxa de falha de envio subir.
+
+### Critério de “pronto em produção”
+
+A feature de e-mail só deve ser anunciada aos fornecedores quando **todos** os itens abaixo forem verdadeiros:
+
+- [ ] Domínio/remetente aprovados pela TI  
+- [ ] Teste com ≥ 2 caixas reais (interna + fornecedor piloto)  
+- [ ] Fallback dashboard documentado para a operação  
+- [ ] Secrets apenas em cofre / Secrets do Cloud (nunca no Git)  
+- [ ] Texto do e-mail revisado (sem dados sensíveis desnecessários)
+
+Até lá, mantenha o fluxo MVP (senha temporária via equipe) como caminho oficial.
 
 ---
 
@@ -586,10 +655,13 @@ API intermediária
 - [x] Cadastro `fornecedores_codigos.json` gerado da FUP
 - [x] Tabelas `contas_fornecedor` / `acessos_log` + RLS fechado (`sql/fechar_rls.sql`)
 - [x] App com `SUPABASE_SERVICE_ROLE_KEY`
+- [x] Dashboard: filtro de período + relatório PDF + export FUP
+- [x] Reset de senha pela equipe (senha temporária no dashboard)
 - [ ] Domínio amigável (mesmo no Streamlit)
 - [ ] Proteger dashboard (VPN / SSO; não divulgar URL)
 
 ### Fase 2 — Produção controlada (1–3 meses)
+- [ ] **Validar troca de senha por e-mail** (seção 12.1 — domínio DNS + Resend/SMTP)
 - [ ] Dockerizar `app.py` e `dashboard.py`
 - [ ] Migrar IDs para tabela `fornecedores` (IDs estáveis / SAP)
 - [ ] Deploy em Azure/AWS aprovado pela TI
@@ -608,8 +680,11 @@ API intermediária
 
 | Arquivo | Conteúdo |
 |---|---|
+| [MAPA_DOCUMENTACAO.md](MAPA_DOCUMENTACAO.md) | Índice para repasse e replicação |
 | [GUIA_IMPLANTACAO.md](GUIA_IMPLANTACAO.md) | Passo a passo do MVP (Supabase + Streamlit Cloud) |
 | [README.md](README.md) | Visão técnica e execução local |
+| [roadmap_mvp_producao.html](roadmap_mvp_producao.html) | Roadmap visual MVP → produção |
+| [APRESENTACAO.html](APRESENTACAO.html) | Slides para apresentação |
 | `.env.example` | Variáveis de configuração |
 
 ---
@@ -623,7 +698,8 @@ API intermediária
 | Compras / Supply Chain | | Processo e campos do formulário |
 | DBA | | Banco PostgreSQL / Supabase |
 | Jurídico / Privacidade | | Dados pessoais (e-mail fornecedor) |
+| TI / Messaging | | Domínio de e-mail, SPF/DKIM, Resend ou SMTP |
 
 ---
 
-*Documento de arquitetura e deploy — Formulário de Fornecedores Alcoa. Junho/2026.*
+*Documento de arquitetura e deploy — Formulário de Fornecedores Alcoa. Atualizado agosto/2026.*

@@ -5,12 +5,16 @@
 Oi! Você não precisa entender de programação.
 Siga só estes passos, na ordem.
 
+Documentação completa (para quem for replicar o desenvolvimento):
+  MAPA_DOCUMENTACAO.md
+
 
 ------------------------------------------------------------------------
 O QUE VOCÊ VAI USAR
 ------------------------------------------------------------------------
   Formulário  = o que o fornecedor preenche (pode ser pela internet)
   Dashboard   = tela interna da Alcoa para ver as respostas
+                (métricas, período, PDF, reset de senha, Excel)
 
 Tem DOIS jeitos. Escolha UM:
 
@@ -22,7 +26,7 @@ Não precisa instalar nada no computador.
 
 1. Peça para a pessoa que te passou o projeto:
      - o LINK do formulário (Streamlit)
-     - o LINK do dashboard (só você / uso interno)
+     - o LINK do dashboard (só você / uso interno — NÃO divulgue)
 
 2. Abra o link no Chrome ou Edge
 3. Pronto.
@@ -60,9 +64,11 @@ PASSO 3 - No dia a dia
     1 = Formulário
     2 = Dashboard
 
-  No Dashboard, se quiser exportar as respostas relacionadas à FUP
-  (sem alterar o Excel principal):
-    "Exportar retorno para Excel (sem mexer na FUP)"
+  No Dashboard:
+    - Escolha o PERÍODO (7 dias, 15 dias, mês, personalizado…)
+    - "Exportar relatório PDF" para reunião
+    - "Exportar retorno para Excel (sem mexer na FUP)"
+    - Aba "Reset senha de fornecedor" se alguém esquecer a senha
 
 
 ------------------------------------------------------------------------
@@ -79,11 +85,17 @@ NÃO tente rodar direto pelo caminho que começa com \\noa.alcoa.com\...
 ------------------------------------------------------------------------
 COMO O FORNECEDOR ENTRA (nuvem ou local)
 ------------------------------------------------------------------------
-  1. Cadastro: cria USUÁRIO + SENHA e informa o CÓDIGO Alcoa da empresa
+  1. Cadastro: cria USUÁRIO + SENHA + e-mail e informa o CÓDIGO Alcoa
   2. Login: entra com o usuário (ou o código) + senha
   3. Busca pedidos, preenche e envia
 
-  Redefinir senha exige a senha atual.
+  Esqueceu a senha?
+  - A equipe Alcoa gera uma SENHA TEMPORÁRIA no dashboard
+  - Passa essa senha ao fornecedor (Teams / telefone)
+  - No formulário, o fornecedor clica em "Esqueci a senha",
+    informa a temporária e cria a senha nova
+
+  (Envio automático por e-mail fica para produção — depende de TI/DNS.)
 
 
 ------------------------------------------------------------------------
@@ -103,6 +115,8 @@ Mande mensagem para quem te passou o projeto com:
   2. O que você clicou (nome do .bat)
 
 Ou leia:
+  MAPA_DOCUMENTACAO.md       → índice de tudo
+  GUIA_IMPLANTACAO.md        → implantação técnica do MVP
   COMO_INSTALAR_PYTHON.txt   → se faltar Python
   COMO_RODAR_OUTRO_PC.txt    → detalhes técnicos
 

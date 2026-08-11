@@ -121,7 +121,7 @@
 <body>
   <div class="wrap">
     <h1>Formulário de Fornecedores Alcoa</h1>
-    <p class="sub">Jornada completa: MVP → Produção básica → Produção forte (segurança e observabilidade)</p>
+    <p class="sub">Jornada completa: MVP → Produção básica → Produção forte (segurança, e-mail OTP e observabilidade)</p>
 
     <section>
       <h2>Roadmap - visão geral</h2>
@@ -130,26 +130,26 @@ flowchart LR
     subgraph mvp [MVP]
         direction TB
         M1[Streamlit Cloud]
-        M2[Login ID fornecedor]
-        M3[Dashboard interno]
-        M4[Supabase + Storage FUP]
-        M5[JSON códigos no Storage]
+        M2[Login usuário + senha]
+        M3[Dashboard período + PDF]
+        M4[Reset senha admin]
+        M5[Supabase + RLS fechado]
     end
 
     subgraph basica [Produção básica]
         direction TB
         B1[Domínio Alcoa]
-        B2[Senha em hash]
+        B2[OTP / e-mail validado]
         B3[Tabela fornecedores]
-        B4[RLS revisada]
-        B5[Backup diário]
+        B4[Backup diário]
+        B5[VPN no dashboard]
     end
 
     subgraph forte [Produção forte]
         direction TB
         F1[Docker / Azure]
         F2[SSO Azure AD]
-        F3[VPN dashboard]
+        F3[Key Vault]
         F4[API / SAP]
         F5[Logs e alertas]
     end
@@ -157,11 +157,11 @@ flowchart LR
     mvp -->|oficializar| basica
     basica -->|compliance TI| forte
 
-    mvp --- MS[Seg: ID fornecedor + Secrets + JSON no Storage]
-    mvp --- MO[Obs: codigo_fornecedor + Excel]
+    mvp --- MS[Seg: hash + service_role + reset admin]
+    mvp --- MO[Obs: período + PDF + Excel]
 
-    basica --- BS[Seg: hash + IDs fixos + RLS]
-    basica --- BO[Obs: backup + domínio + logs]
+    basica --- BS[Seg: e-mail DNS + IDs fixos]
+    basica --- BO[Obs: backup + domínio]
 
     forte --- FS[Seg: SSO + VPN + cofre]
     forte --- FO[Obs: Splunk + auditoria]
@@ -232,12 +232,11 @@ flowchart TB
       <pre class="timeline">MVP (agora)          Produção básica (2–4 sem)     Produção forte (1–3 meses+)
 ─────────────────    ─────────────────────────    ─────────────────────────────
 Streamlit Cloud  →   Domínio Alcoa            →   Azure / Docker
-ID fornecedor    →   IDs no banco             →   Token / e-mail / SAP
-Senha dashboard  →   Senha em hash            →   SSO Azure AD
-JSON local       →   Tabela fornecedores      →   Master data SAP
-RLS aberta       →   RLS revisada             →   Políticas corporativas
-Export manual    →   Backup diário            →   Splunk / alertas
-Piloto           →   Processo oficializado    →   Compliance total</pre>
+Usuário + senha  →   OTP por e-mail validado  →   SSO Azure AD
+Reset no dash    →   DNS SPF/DKIM + Resend    →   Key Vault / cofre
+Período + PDF    →   Backup diário            →   Splunk / alertas
+RLS fechado      →   VPN no dashboard         →   Compliance total
+Piloto           →   Processo oficializado    →   Integração SAP</pre>
     </section>
 
     <section>
@@ -247,27 +246,26 @@ Piloto           →   Processo oficializado    →   Compliance total</pre>
           <h3><span class="tag tag-mvp">MVP</span> Piloto</h3>
           <p><strong>Objetivo:</strong> validar processo com fornecedores reais.</p>
           <ul>
-            <li>Formulário com login por ID</li>
-            <li>Dashboard interno (não divulgar URL)</li>
-            <li>JSON de códigos no Storage (nuvem)</li>
-            <li>Export retorno FUP (Excel auxiliar)</li>
-            <li>Supabase + FUP no Storage</li>
-            <li>Streamlit Cloud</li>
-            <li>Secrets fora do Git</li>
+            <li>Login usuário + senha + código Alcoa</li>
+            <li>Dashboard: período, PDF, export FUP</li>
+            <li>Reset de senha pela equipe (temporária)</li>
+            <li>JSON de códigos no Storage</li>
+            <li>Supabase + RLS fechado + service_role</li>
+            <li>Streamlit Cloud · Secrets fora do Git</li>
           </ul>
-          <p><strong>Prazo:</strong> já em andamento</p>
+          <p><strong>Prazo:</strong> em operação</p>
         </div>
         <div class="fase basica">
           <h3><span class="tag tag-basica">Básica</span> Oficializar</h3>
           <p><strong>Objetivo:</strong> uso formal com pouco esforço extra.</p>
           <ul>
             <li>Domínio fornecedores.alcoa.com.br</li>
+            <li><strong>Validar OTP / senha por e-mail</strong> (DNS + Resend/SMTP)</li>
             <li>IDs estáveis (tabela fornecedores)</li>
-            <li>Senha dashboard em hash</li>
             <li>Backup automático Supabase</li>
-            <li>RLS revisada</li>
+            <li>VPN / proteção do dashboard</li>
           </ul>
-          <p><strong>Prazo:</strong> 2–4 semanas</p>
+          <p><strong>Prazo:</strong> 2–4 semanas (+ aprovações TI e-mail)</p>
         </div>
         <div class="fase forte">
           <h3><span class="tag tag-forte">Forte</span> Corporativo</h3>
@@ -298,14 +296,20 @@ Piloto           →   Processo oficializado    →   Compliance total</pre>
         <tbody>
           <tr>
             <td><strong>Acesso fornecedor</strong></td>
-            <td>ID numérico (código)</td>
-            <td>ID fixo no banco</td>
+            <td>Usuário + senha + código Alcoa</td>
+            <td>IDs estáveis no banco</td>
             <td>E-mail + token ou código SAP</td>
           </tr>
           <tr>
+            <td><strong>Recuperação de senha</strong></td>
+            <td>Reset admin (temporária no dashboard)</td>
+            <td><strong>OTP / e-mail validado</strong> (DNS + Resend/SMTP)</td>
+            <td>E-mail corporativo + auditoria</td>
+          </tr>
+          <tr>
             <td><strong>Acesso equipe</strong></td>
-            <td>URL restrita / VPN / SSO (MVP sem senha no app)</td>
-            <td>Senha em hash, vários usuários</td>
+            <td>URL restrita / VPN (não divulgar)</td>
+            <td>VPN + autenticação no dash</td>
             <td>SSO Azure AD + VPN</td>
           </tr>
           <tr>
@@ -316,8 +320,8 @@ Piloto           →   Processo oficializado    →   Compliance total</pre>
           </tr>
           <tr>
             <td><strong>Banco</strong></td>
-            <td>Supabase free/pro, RLS aberta</td>
-            <td>RLS revisada, índice único</td>
+            <td>Supabase, RLS fechado + service_role</td>
+            <td>Backup + IDs estáveis</td>
             <td>PostgreSQL corporativo</td>
           </tr>
           <tr>
@@ -328,7 +332,7 @@ Piloto           →   Processo oficializado    →   Compliance total</pre>
           </tr>
           <tr>
             <td><strong>Visualização</strong></td>
-            <td>Dashboard + export Excel</td>
+            <td>Dashboard (período + PDF + Excel)</td>
             <td>+ domínio corporativo</td>
             <td>+ Power BI / logs Splunk</td>
           </tr>
@@ -341,7 +345,7 @@ Piloto           →   Processo oficializado    →   Compliance total</pre>
           <tr>
             <td><strong>Quem aprova</strong></td>
             <td>Equipe do projeto</td>
-            <td>Gestor + compras</td>
+            <td>Gestor + compras + TI (e-mail)</td>
             <td>TI + segurança + compliance</td>
           </tr>
         </tbody>
@@ -383,7 +387,9 @@ flowchart TB
     </section>
 
     <p class="hint">
-      <strong>Para baixar:</strong> abra no navegador → <kbd>Ctrl</kbd>+<kbd>P</kbd> → Salvar como PDF.
+      <strong>Para baixar:</strong> abra no navegador → <kbd>Ctrl</kbd>+<kbd>P</kbd> → Salvar como PDF.<br>
+      <strong>Detalhe técnico da validação de e-mail:</strong> seção 12.1 em <code>DEPLOY_PRODUCAO.md</code>.
+      Índice de docs: <code>MAPA_DOCUMENTACAO.md</code>.
     </p>
   </div>
 

@@ -198,12 +198,12 @@ flowchart TB
           <tr><th>Segurança</th><th>Observabilidade</th></tr>
         </thead>
         <tbody>
-          <tr><td>Login por ID do fornecedor</td><td>codigo_fornecedor em cada envio</td></tr>
+          <tr><td>Login usuário + senha (hash) + código Alcoa</td><td>codigo_fornecedor em cada envio</td></tr>
+          <tr><td>Reset admin (senha temporária no dashboard)</td><td>Dashboard: período, métricas, PDF</td></tr>
           <tr><td>Dashboard URL interna (não pública)</td><td>Timestamps de início e fim</td></tr>
-          <tr><td>Secrets fora do Git</td><td>Dashboard com métricas e filtros</td></tr>
-          <tr><td>FUP e JSON fora do GitHub / Storage</td><td>Export Excel + retorno FUP</td></tr>
-          <tr><td>HTTPS na nuvem</td><td>Table Editor no Supabase</td></tr>
-          <tr><td>1 envio por PO + linha</td><td>Mensagens de erro no app</td></tr>
+          <tr><td>Secrets fora do Git + service_role</td><td>Export Excel + retorno FUP + PDF</td></tr>
+          <tr><td>FUP e JSON fora do GitHub / Storage</td><td>Table Editor + acessos_log</td></tr>
+          <tr><td>HTTPS na nuvem · RLS fechado</td><td>Mensagens de erro no app</td></tr>
         </tbody>
       </table>
     </section>
@@ -217,12 +217,12 @@ flowchart TB
         <tbody>
           <tr>
             <td><strong>Produção básica</strong></td>
-            <td>VPN/SSO no dash, IDs fixos, RLS revisada</td>
+            <td>OTP/e-mail validado (DNS + Resend/SMTP), VPN no dash, IDs fixos</td>
             <td>Backup automático, domínio próprio</td>
           </tr>
           <tr>
             <td><strong>Produção forte</strong></td>
-            <td>SSO, VPN, API SAP</td>
+            <td>SSO, VPN, Key Vault, API SAP</td>
             <td>Logs centralizados, alertas, auditoria</td>
           </tr>
         </tbody>
@@ -231,7 +231,7 @@ flowchart TB
 
     <p class="hint">
       <strong>Para baixar:</strong> abra este arquivo no navegador → <kbd>Ctrl</kbd>+<kbd>P</kbd> → Salvar como PDF.
-      Ou clique com o botão direito no diagrama → Salvar imagem (após carregar).
+      Validação de e-mail: <code>DEPLOY_PRODUCAO.md</code> §12.1 · Índice: <code>MAPA_DOCUMENTACAO.md</code>.
     </p>
   </div>
 

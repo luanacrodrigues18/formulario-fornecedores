@@ -1,6 +1,9 @@
 # Guia de implantação - Formulário de Fornecedores
 
-Documentação passo a passo: **Supabase** (banco + Storage), **cadastro/login com usuário e senha**, **RLS fechado com service_role** e **Streamlit Cloud**.
+Documentação passo a passo do **MVP**: **Supabase** (banco + Storage), **cadastro/login**, **reset de senha pela equipe**, **dashboard** (período + PDF), **RLS fechado com service_role** e **Streamlit Cloud**.
+
+> Índice geral: [MAPA_DOCUMENTACAO.md](MAPA_DOCUMENTACAO.md)  
+> Produção corporativa e **OTP por e-mail**: [DEPLOY_PRODUCAO.md](DEPLOY_PRODUCAO.md)
 
 ---
 
@@ -36,10 +39,11 @@ Siga **nesta ordem**:
    `streamlit run app.py` (ou `INICIAR.bat`).
 
 7. **Testar**  
-   - Cadastro: usuário + senha + código Alcoa.  
+   - Cadastro: usuário + senha + e-mail + código Alcoa.  
    - Login: usuário (ou código) + senha.  
    - Enviar um pedido.  
-   - Conferir no Table Editor: `contas_fornecedor`, `acessos_log`, `formulario`.
+   - Conferir no Table Editor: `contas_fornecedor`, `acessos_log`, `formulario`.  
+   - Dashboard: período → métricas → PDF → reset de senha (aba dedicada).
 
 8. **Streamlit Cloud (opcional)**  
    Secrets iguais ao `.env` (incluindo `SUPABASE_SERVICE_ROLE_KEY`) + deploy de `app.py` / `dashboard.py`.
@@ -59,18 +63,23 @@ app.py - página única: busca, lista e formulário
         ↓
 envia resposta → tabela formulario (+ codigo_fornecedor)
 
-Equipe Alcoa  →  dashboard.py  →  lê Supabase / exporta retorno FUP
+Equipe Alcoa  →  dashboard.py
+                 ├─ período (7/15 dias, mês, personalizado…)
+                 ├─ métricas / gráficos / PDF
+                 ├─ export Excel + retorno FUP
+                 └─ reset senha (temporária → fornecedor troca)
 ```
 
 
 | Componente         | Arquivo                         | Função                                      |
 | ------------------ | ------------------------------- | ------------------------------------------- |
 | Formulário         | `app.py`                        | Página única, busca e envio                 |
-| Autenticação       | `auth_fornecedor.py`            | Cadastro, login, redefinir senha            |
-| Contas             | `contas_fornecedor.py`          | Hash, bloqueio, logs, Supabase/JSON         |
+| Autenticação       | `auth_fornecedor.py`            | Cadastro, login, alterar / esqueci senha    |
+| Contas             | `contas_fornecedor.py`          | Hash, bloqueio, reset admin, logs           |
+| E-mail (produção)  | `email_smtp.py`                 | Resend / SMTP — OTP quando domínio ok       |
 | Cadastro de IDs    | `fornecedores_codigos.json`     | Mapa `ID → nome do fornecedor`              |
 | Gerador de IDs     | `gerar_codigos_fornecedores.py` | Cria JSON a partir da FUP                   |
-| Dashboard interno  | `dashboard.py`                  | Visualiza, filtra, exporta e retorno FUP    |
+| Dashboard interno  | `dashboard.py`                  | Período, PDF, filtros, export, reset senha  |
 | Banco de dados     | `database.py`                   | Supabase (prefere service_role)             |
 | Planilha FUP       | `planilha.py`                   | Lê pedidos; exporta retorno sem gravar xlsm |
 | Assistente         | `alcoano.py`                    | ALUX - dicas e FAQ                          |
@@ -274,11 +283,17 @@ Abra: `http://localhost:8501`
 streamlit run dashboard.py
 ```
 
+1. Na aba **Dashboard / métricas**, escolha o **período** (ex.: Últimos 7 dias, 15 dias, mês, personalizado).
+2. Confira métricas e gráficos do intervalo.
+3. Clique em **Exportar relatório PDF** — o PDF deve trazer o período e as pendências.
+4. Na aba **Filtros e tabela**, teste filtros e **Exportar retorno para Excel (sem mexer na FUP)**.
+5. Na aba **Reset senha de fornecedor**, gere uma senha temporária de teste e confirme o fluxo “Esqueci a senha” no formulário.
+
 
 
 ### 2.7 Checklist do teste local
 
-- [ ] Cadastro com usuário + senha + código Alcoa válido
+- [ ] Cadastro com usuário + senha + e-mail + código Alcoa válido
 - [ ] Login com usuário ou código + senha
 - [ ] Código Alcoa inválido mostra erro claro
 - [ ] Conta aparece em `contas_fornecedor` (Table Editor)
@@ -287,6 +302,9 @@ streamlit run dashboard.py
 - [ ] Busca por PO filtra dentro dos pedidos dele
 - [ ] Envio grava no Supabase com `codigo_fornecedor`
 - [ ] Dashboard mostra o registro
+- [ ] Filtro de período altera métricas / gráficos / PDF
+- [ ] PDF exporta sem erro (`fpdf2` no `requirements.txt`)
+- [ ] Reset admin: senha temporária → “Esqueci a senha” no formulário
 - [ ] É possível enviar de novo para o mesmo PO+linha (gera novo registro)
 - [ ] Botão **Sair** encerra a sessão
 
@@ -398,6 +416,11 @@ SUPABASE_STORAGE_BUCKET = "Form"
 SUPABASE_FUP_FILE = "relatorio_fup.xlsm"
 SUPABASE_CODIGOS_FILE = "fornecedores_codigos.json"
 FORM_BASE_URL = "https://formulario-fornecedores.streamlit.app"
+
+# Opcional no MVP (reset de senha usa o dashboard).
+# Obrigatório só se for ativar OTP por e-mail em produção — ver DEPLOY_PRODUCAO.md
+# RESEND_API_KEY = "re_xxxxx"
+# EMAIL_FROM = "noreply@seu-dominio-verificado.com"
 ```
 
 1. Salve e clique em **Reboot app**.
@@ -407,6 +430,8 @@ FORM_BASE_URL = "https://formulario-fornecedores.streamlit.app"
 > **Login na nuvem:** com o JSON no bucket `Form` e a `SUPABASE_SERVICE_ROLE_KEY` nos Secrets, o app baixa o cadastro e grava contas/respostas com RLS fechado.
 
 > Local usa `.env`. Na nuvem usa **Secrets** - são a mesma configuração, em lugares diferentes.
+
+> **Reset de senha no MVP:** não precisa de Resend. Use a aba **Reset senha de fornecedor** no dashboard.
 
 
 
@@ -419,6 +444,7 @@ O dashboard é um **segundo app** no Streamlit Cloud:
 3. **Main file path:** `dashboard.py`
 4. Use os **mesmos Secrets** do formulário.
 5. Deploy e **Reboot**.
+6. Confirme: filtro de período, botão de PDF e aba de reset de senha.
 
 
 
@@ -430,7 +456,7 @@ git commit -m "Descrição da mudança"
 git push
 ```
 
-No Streamlit Cloud: **⋮** → **Reboot app** (ou aguarde o redeploy automático).
+No Streamlit Cloud: **⋮** → **Reboot app** (ou aguarde o redeploy automático). Se o PDF falhar com “No module named fpdf”, faça **Reboot** para reinstalar `requirements.txt` (`fpdf2`).
 
 ---
 
@@ -443,20 +469,36 @@ No Streamlit Cloud: **⋮** → **Reboot app** (ou aguarde o redeploy automátic
 ### Formulário (`app.py`)
 
 1. Abra a URL pública do formulário.
-2. Faça cadastro (usuário + senha + código) e login.
+2. Faça cadastro (usuário + senha + e-mail + código) e login.
 3. Confira isolamento (só pedidos daquele fornecedor).
 4. Preencha e envie.
 5. Confirme no Supabase (**Table Editor** → `formulario`) que o registro apareceu com `codigo_fornecedor`.
+6. Teste **Esqueci a senha** com uma senha temporária gerada no dashboard.
 
 
 
 ### Dashboard (`dashboard.py`)
 
-1. Abra a URL do dashboard.
+1. Abra a URL do dashboard (**não divulgue** publicamente).
 2. Verifique se aparece a mensagem de dados carregados do Supabase.
-3. Confira métricas, filtros e exportação Excel das respostas.
-4. Use **Exportar retorno para Excel (sem mexer na FUP)** para gerar o auxiliar
-   (PO+linha + Data/Obs/NF com match na aba Follow-up-Release). O `.xlsm` principal **não** é alterado.
+3. Escolha um **período** e confira métricas / gráficos.
+4. Exporte o **PDF** e abra o arquivo (deve trazer o rótulo do período).
+5. Use filtros e **Exportar retorno para Excel (sem mexer na FUP)**.
+6. Na aba **Reset senha**, gere temporária e valide o ciclo completo com um usuário de teste.
+
+---
+
+
+
+## Parte 5.1 - Reset de senha (MVP) vs e-mail (produção)
+
+| Situação | Como funciona hoje |
+|---|---|
+| Fornecedor esqueceu a senha | Equipe gera **senha temporária** no dashboard → passa por Teams/telefone → fornecedor usa **Esqueci a senha** |
+| Login com senha temporária / forçada | App exige **nova senha** antes de continuar |
+| Enviar OTP / link por e-mail | Código em `email_smtp.py` pronto; **não é o fluxo principal do MVP** |
+
+Para ativar e **validar** envio por e-mail (domínio DNS, Resend/SMTP corporativo, testes de caixa de entrada), siga a seção dedicada em [DEPLOY_PRODUCAO.md](DEPLOY_PRODUCAO.md#validação-troca-de-senha-por-e-mail-produção).
 
 ---
 
@@ -512,22 +554,45 @@ ALTER TABLE formulario ADD COLUMN IF NOT EXISTS codigo_fornecedor TEXT;
 
 
 
+### PDF indisponível / `No module named 'fpdf'`
+
+**Causa:** ambiente Cloud ainda sem reinstalar dependências após incluir `fpdf2`.
+
+**Solução:** **Reboot** do app `dashboard.py` no Streamlit Cloud. O código também tem fallback sem `fpdf`, mas o ideal é o pacote instalado.
+
+### Reset de senha / “Esqueci a senha” sem e-mail
+
+**Causa esperada no MVP:** recuperação por e-mail ainda não é o fluxo principal.
+
+**Solução:** use a aba **Reset senha de fornecedor** no dashboard. OTP por e-mail = produção ([DEPLOY_PRODUCAO.md](DEPLOY_PRODUCAO.md)).
+
+---
+
+
+
 ## Estrutura final do projeto
 
 ```
 Project Form/
 ├── app.py
 ├── auth_fornecedor.py
+├── contas_fornecedor.py
 ├── dashboard.py
 ├── database.py
 ├── planilha.py
 ├── alcoano.py
+├── email_smtp.py
+├── prazo_resposta.py
 ├── gerar_codigos_fornecedores.py
-├── requirements.txt
+├── requirements.txt          # inclui fpdf2
 ├── .env.example
 ├── .streamlit/config.toml
+├── MAPA_DOCUMENTACAO.md
 ├── GUIA_IMPLANTACAO.md
 ├── DEPLOY_PRODUCAO.md
+├── roadmap_mvp_producao.html
+├── APRESENTACAO.html
+├── LEIA_PRIMEIRO.txt
 ├── fornecedores_codigos.json.example
 ├── fornecedores_codigos.json     # Apenas local / Storage (não vai pro Git)
 └── relatorio_fup.xlsm            # Apenas local / Storage (não vai pro Git)
@@ -540,13 +605,17 @@ Project Form/
 ## Resumo rápido (cola)
 
 1. **Supabase:** tabelas `formulario`, `contas_fornecedor`, `acessos_log` + `fechar_rls.sql` + Storage (FUP e JSON) + `SERVICE_ROLE_KEY`.
-2. **Local:** `.env` + `pip install` + gerar códigos + `streamlit run app.py`.
-3. **Login:** cadastro (usuário + senha + código Alcoa) → login → só pedidos da empresa → envio.
-4. **GitHub:** push sem `.env`, sem FUP e sem `fornecedores_codigos.json`.
-5. **Streamlit Cloud:** deploy com Secrets (incluindo `SUPABASE_SERVICE_ROLE_KEY`).
-6. **Testar:** cadastro → login → envio → Supabase → dashboard.
+2. **Local:** `.env` + `pip install` + gerar códigos + `streamlit run app.py` / `dashboard.py`.
+3. **Login:** cadastro → login → só pedidos da empresa → envio.
+4. **Senha esquecida (MVP):** dashboard gera temporária → fornecedor redefine.
+5. **Dashboard:** período → PDF → Excel / retorno FUP.
+6. **GitHub:** push sem `.env`, sem FUP e sem `fornecedores_codigos.json`.
+7. **Streamlit Cloud:** deploy com Secrets (incluindo `SUPABASE_SERVICE_ROLE_KEY`) + Reboot.
+8. **E-mail OTP:** só validar em produção (domínio + Resend/SMTP) — ver DEPLOY_PRODUCAO.md.
 
 ---
+
+*Guia de implantação MVP — Formulário de Fornecedores Alcoa. Atualizado agosto/2026.*
 
 *Documentação do Formulário de Fornecedores Alcoa - atualizada em julho/2026.*
 
