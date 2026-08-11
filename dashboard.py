@@ -1,6 +1,5 @@
 from datetime import date, datetime, timedelta
 from io import BytesIO
-import os
 import traceback
 from pathlib import Path
 
@@ -32,7 +31,7 @@ try:
         supabase_configurado,
         valor_vazio,
     )
-    from planilha import buscar_por_po_e_linha, montar_link_formulario, exportar_retorno_fup_excel
+    from planilha import exportar_retorno_fup_excel
     from prazo_resposta import (
         carregar_prazo,
         contar_por_prazo,
@@ -61,7 +60,6 @@ LARGURAS_COLUNAS = [8, 18, 22, 22, 30, 25, 28, 18, 35, 18, 22]
 COL_NF = COLUNAS_EXIBICAO["numero_nf"]
 COL_OBS = COLUNAS_EXIBICAO["observacoes_coleta"]
 OPCOES_PAGINA = [10, 25, 50, 100]
-FORM_BASE_URL_PADRAO = os.getenv("FORM_BASE_URL", "http://localhost:8501")
 
 
 def _parse_datetime(valor) -> datetime | None:
@@ -327,7 +325,7 @@ def _chart_top_fornecedores(df: pd.DataFrame) -> alt.Chart:
 # ── Cabeçalho ───────────────────────────────────────────────────────────────
 col_titulo, col_btn1, col_btn2 = st.columns([4, 1, 1])
 with col_titulo:
-    st.title("📊 Dashboard de Fornecedores")
+    st.title("📊 Painel Alcoa — Fornecedores")
 with col_btn1:
     st.write("")
     if st.button("🔄 Atualizar", type="primary", use_container_width=True):
@@ -342,172 +340,296 @@ if auto_atualizar:
         height=0,
     )
 
-agora = agora_brasil()
-st.caption(
-    f"Última leitura: {agora.strftime('%d/%m/%Y %H:%M:%S')} (horário de Brasília) · "
-    "Linhas em amarelo = sem NF ou sem observação"
+aba_dash, aba_reset = st.tabs(
+    ["📊 Dashboard de fornecedores", "🔑 Reset senha de fornecedor"]
 )
+
+agora = agora_brasil()
 
 try:
     garantir_arquivo_prazo()
 except Exception:
     pass
 
-if supabase_configurado():
-    try:
-        criar_tabela()
-        st.caption("Dados carregados do Supabase.")
-    except RuntimeError as exc:
-        st.warning(f"Supabase com erro: {exc}. Tentando exibir dados do Excel.")
-else:
-    st.info("Exibindo respostas salvas em `formulario_respostas.xlsx`.")
-
-try:
-    registros = ordenar_por_data(buscar_todos())
-except Exception as exc:
-    st.error(f"Erro ao buscar registros: {exc}")
-    st.stop()
-
-ultimo = ultimo_envio(registros)
-limite_atual = data_limite_atual()
-contagem_prazo = contar_por_prazo(registros, limite_atual)
-
-# ── Cards ───────────────────────────────────────────────────────────────────
-c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Total geral", len(registros))
-c2.metric("Envios hoje", contar_envios_hoje(registros))
-c3.metric("Últimos 7 dias", contar_envios_semana(registros))
-c4.metric("Sem Número da NF", contar_sem_nf(registros))
-c5.metric(
-    "Último envio",
-    ultimo.strftime("%d/%m %H:%M") if ultimo else "—",
-)
-
-if limite_atual:
-    p1, p2, p3 = st.columns(3)
-    p1.metric("Retornos no prazo", contagem_prazo.get("No prazo", 0))
-    p2.metric("Retornos atrasados", contagem_prazo.get("Atrasado", 0))
-    p3.metric("Data limite do form", limite_atual.strftime("%d/%m/%Y"))
-
-# ── Prazo para preencher o formulário ───────────────────────────────────────
-with st.expander("⏰ Prazo para o fornecedor preencher o formulário", expanded=not limite_atual):
-    st.markdown(
-        """
-        Defina até quando o fornecedor deve **abrir o formulário e enviar o retorno**.
-        No retorno, o fornecedor informa a **Data da Promessa** (quando o material estará pronto).
-
-        - **X dias** → calcula a data limite a partir de hoje e grava essa data fixa  
-        - **Data limite** → você escolhe o dia final  
-        """
+with aba_dash:
+    st.caption(
+        f"Última leitura: {agora.strftime('%d/%m/%Y %H:%M:%S')} (horário de Brasília) · "
+        "Linhas em amarelo = sem NF ou sem observação"
     )
-    cfg = carregar_prazo()
+
+    if supabase_configurado():
+        try:
+            criar_tabela()
+            st.caption("Dados carregados do Supabase.")
+        except RuntimeError as exc:
+            st.warning(f"Supabase com erro: {exc}. Tentando exibir dados do Excel.")
+    else:
+        st.info("Exibindo respostas salvas em `formulario_respostas.xlsx`.")
+
+    try:
+        registros = ordenar_por_data(buscar_todos())
+    except Exception as exc:
+        st.error(f"Erro ao buscar registros: {exc}")
+        st.stop()
+
+    ultimo = ultimo_envio(registros)
+    limite_atual = data_limite_atual()
+    contagem_prazo = contar_por_prazo(registros, limite_atual)
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Total geral", len(registros))
+    c2.metric("Envios hoje", contar_envios_hoje(registros))
+    c3.metric("Últimos 7 dias", contar_envios_semana(registros))
+    c4.metric("Sem Número da NF", contar_sem_nf(registros))
+    c5.metric(
+        "Último envio",
+        ultimo.strftime("%d/%m %H:%M") if ultimo else "—",
+    )
+
     if limite_atual:
-        obs_atual = (cfg or {}).get("observacao") or ""
-        st.info(
-            f"Prazo atual: **{limite_atual.strftime('%d/%m/%Y')}**"
-            + (f" — {obs_atual}" if obs_atual else "")
+        p1, p2, p3 = st.columns(3)
+        p1.metric("Retornos no prazo", contagem_prazo.get("No prazo", 0))
+        p2.metric("Retornos atrasados", contagem_prazo.get("Atrasado", 0))
+        p3.metric("Data limite do form", limite_atual.strftime("%d/%m/%Y"))
+
+    with st.expander(
+        "⏰ Prazo para o fornecedor preencher o formulário",
+        expanded=not limite_atual,
+    ):
+        st.markdown(
+            """
+            Defina até quando o fornecedor deve **abrir o formulário e enviar o retorno**.
+            No retorno, o fornecedor informa a **Data da Promessa** (quando o material estará pronto).
+
+            - **X dias** → calcula a data limite a partir de hoje e grava essa data fixa
+            - **Data limite** → você escolhe o dia final
+            """
+        )
+        cfg = carregar_prazo()
+        if limite_atual:
+            obs_atual = (cfg or {}).get("observacao") or ""
+            st.info(
+                f"Prazo atual: **{limite_atual.strftime('%d/%m/%Y')}**"
+                + (f" — {obs_atual}" if obs_atual else "")
+            )
+
+        modo = st.radio(
+            "Como definir",
+            ["Em X dias (a partir de hoje)", "Data limite fixa"],
+            horizontal=True,
+            key="modo_prazo",
+        )
+        obs = st.text_input(
+            "Observação (opcional, aparece no formulário)",
+            value=(cfg or {}).get("observacao", "") if cfg else "",
+            placeholder="Ex.: campanha FUP julho",
+            key="obs_prazo",
         )
 
-    modo = st.radio(
-        "Como definir",
-        ["Em X dias (a partir de hoje)", "Data limite fixa"],
-        horizontal=True,
-        key="modo_prazo",
-    )
-    obs = st.text_input(
-        "Observação (opcional, aparece no formulário)",
-        value=(cfg or {}).get("observacao", "") if cfg else "",
-        placeholder="Ex.: campanha FUP julho",
-        key="obs_prazo",
-    )
-
-    col_a, col_b, col_c = st.columns([2, 1, 1])
-    with col_a:
-        if modo.startswith("Em X"):
-            dias_prazo = st.number_input(
-                "Dias para responder",
-                min_value=0,
-                max_value=365,
-                value=int((cfg or {}).get("dias_origem") or 7),
-                step=1,
-                key="dias_prazo",
-            )
-            preview = data_limite_em_dias(int(dias_prazo))
-            st.caption(f"Data limite calculada: **{preview.strftime('%d/%m/%Y')}**")
-        else:
-            valor_data = limite_atual or (agora.date() + timedelta(days=7))
-            data_escolhida = st.date_input(
-                "Data limite",
-                value=valor_data,
-                format="DD/MM/YYYY",
-                key="data_prazo",
-            )
-            dias_prazo = None
-            preview = data_escolhida
-
-    with col_b:
-        st.write("")
-        st.write("")
-        if st.button("Salvar prazo", type="primary", use_container_width=True):
-            try:
-                salvar_prazo(
-                    preview,
-                    dias_origem=int(dias_prazo) if dias_prazo is not None else None,
-                    observacao=obs,
+        col_a, col_b, col_c = st.columns([2, 1, 1])
+        with col_a:
+            if modo.startswith("Em X"):
+                dias_prazo = st.number_input(
+                    "Dias para responder",
+                    min_value=0,
+                    max_value=365,
+                    value=int((cfg or {}).get("dias_origem") or 7),
+                    step=1,
+                    key="dias_prazo",
                 )
-                st.success(f"Prazo salvo: {preview.strftime('%d/%m/%Y')}")
+                preview = data_limite_em_dias(int(dias_prazo))
+                st.caption(f"Data limite calculada: **{preview.strftime('%d/%m/%Y')}**")
+            else:
+                valor_data = limite_atual or (agora.date() + timedelta(days=7))
+                data_escolhida = st.date_input(
+                    "Data limite",
+                    value=valor_data,
+                    format="DD/MM/YYYY",
+                    key="data_prazo",
+                )
+                dias_prazo = None
+                preview = data_escolhida
+
+        with col_b:
+            st.write("")
+            st.write("")
+            if st.button("Salvar prazo", type="primary", use_container_width=True):
+                try:
+                    salvar_prazo(
+                        preview,
+                        dias_origem=int(dias_prazo) if dias_prazo is not None else None,
+                        observacao=obs,
+                    )
+                    st.success(f"Prazo salvo: {preview.strftime('%d/%m/%Y')}")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Erro ao salvar prazo: {exc}")
+        with col_c:
+            st.write("")
+            st.write("")
+            if st.button(
+                "Remover prazo", use_container_width=True, disabled=not limite_atual
+            ):
+                limpar_prazo()
                 st.rerun()
+
+    if registros:
+        g1, g2 = st.columns(2)
+        with g1:
+            st.subheader("Envios por dia (7 dias)")
+            df_dias = grafico_envios_por_dia(registros)
+            st.altair_chart(_chart_envios_por_dia(df_dias), use_container_width=True)
+        with g2:
+            st.subheader("Top 10 fornecedores")
+            df_top = grafico_top_fornecedores(registros)
+            st.altair_chart(_chart_top_fornecedores(df_top), use_container_width=True)
+
+    with st.expander("📥 Exportar retorno para Excel (sem mexer na FUP)", expanded=False):
+        st.markdown(
+            """
+            Gera um **Excel novo** com relacionamento:
+
+            - **Verde (pesquisa):** PO com Release + Número da linha
+            - **Amarelo (retorno):** Data da Promessa, Observações de Coleta, Número da NF
+
+            **Não altera** o `relatorio_fup.xlsm`. Serve para conferir o match e, se quiser,
+            fazer *PROCV* / Power Query na planilha principal depois.
+            """
+        )
+        if st.button("Gerar Excel de retorno", type="primary", key="btn_export_retorno_fup"):
+            try:
+                resultado = exportar_retorno_fup_excel(registros)
+                caminho = Path(resultado["arquivo"])
+                st.success(
+                    f"Arquivo gerado: **{caminho.name}** · "
+                    f"Match na FUP: **{resultado['encontrados']}** · "
+                    f"Sem match: **{resultado['nao_encontrados']}**"
+                )
+                st.download_button(
+                    label="⬇️ Baixar Excel de retorno",
+                    data=caminho.read_bytes(),
+                    file_name=caminho.name,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_retorno_fup",
+                )
+                st.caption(f"Também salvo na pasta do projeto: `{caminho.name}`")
             except Exception as exc:
-                st.error(f"Erro ao salvar prazo: {exc}")
-    with col_c:
-        st.write("")
-        st.write("")
-        if st.button("Remover prazo", use_container_width=True, disabled=not limite_atual):
-            limpar_prazo()
+                st.error(f"Erro ao gerar Excel: {exc}")
+
+    st.subheader("Filtros")
+
+    busca_geral = st.text_input(
+        "🔎 Busca geral",
+        placeholder="Procura em todos os campos...",
+    )
+
+    f1, f2, f3, f4 = st.columns(4)
+    with f1:
+        filtro_nome = st.text_input("Nome")
+    with f2:
+        filtro_email = st.text_input("Email")
+    with f3:
+        filtro_po = st.text_input("PO com Release")
+    with f4:
+        filtro_linha = st.text_input("Linha")
+
+    f5, f6, f7, f8 = st.columns(4)
+    with f5:
+        filtro_nf = st.text_input("Número da NF")
+    with f6:
+        usar_filtro_data = st.checkbox("Filtrar por Data da Promessa")
+        filtro_data = None
+        if usar_filtro_data:
+            filtro_data = st.date_input("Data da Promessa", format="DD/MM/YYYY")
+    with f7:
+        somente_incompletos = st.checkbox(
+            "⚠️ Só incompletos",
+            help="Exibe apenas registros sem NF ou sem observação de coleta.",
+        )
+        filtro_prazo = st.selectbox(
+            "Prazo do form",
+            ["Todos", "No prazo", "Atrasado", "Sem prazo", "Sem data"],
+            help="Compara a data do envio com a data limite definida acima.",
+        )
+    with f8:
+        itens_pagina = st.selectbox("Registros por página", OPCOES_PAGINA, index=1)
+
+    registros_filtrados = aplicar_filtros(
+        registros,
+        filtro_nome,
+        filtro_email,
+        filtro_po,
+        filtro_nf,
+        filtro_linha,
+        busca_geral,
+        filtro_data,
+        somente_incompletos,
+        filtro_prazo,
+    )
+
+    total_paginas = max(1, (len(registros_filtrados) + itens_pagina - 1) // itens_pagina)
+
+    if "pagina_atual" not in st.session_state:
+        st.session_state.pagina_atual = 1
+
+    st.session_state.pagina_atual = min(st.session_state.pagina_atual, total_paginas)
+
+    m1, m2 = st.columns(2)
+    m1.metric("Registros filtrados", len(registros_filtrados))
+    m2.metric("Página", f"{st.session_state.pagina_atual} de {total_paginas}")
+
+    pg1, pg2, pg3 = st.columns([1, 2, 1])
+    with pg1:
+        if st.button("← Anterior", disabled=st.session_state.pagina_atual <= 1):
+            st.session_state.pagina_atual -= 1
+            st.rerun()
+    with pg2:
+        nova_pagina = st.number_input(
+            "Ir para página",
+            min_value=1,
+            max_value=total_paginas,
+            value=st.session_state.pagina_atual,
+            step=1,
+        )
+        if nova_pagina != st.session_state.pagina_atual:
+            st.session_state.pagina_atual = int(nova_pagina)
+            st.rerun()
+    with pg3:
+        if st.button("Próxima →", disabled=st.session_state.pagina_atual >= total_paginas):
+            st.session_state.pagina_atual += 1
             st.rerun()
 
-# ── Gráficos ────────────────────────────────────────────────────────────────
-if registros:
-    g1, g2 = st.columns(2)
-    with g1:
-        st.subheader("Envios por dia (7 dias)")
-        df_dias = grafico_envios_por_dia(registros)
-        st.altair_chart(_chart_envios_por_dia(df_dias), use_container_width=True)
-    with g2:
-        st.subheader("Top 10 fornecedores")
-        df_top = grafico_top_fornecedores(registros)
-        st.altair_chart(_chart_top_fornecedores(df_top), use_container_width=True)
+    inicio = (st.session_state.pagina_atual - 1) * itens_pagina
+    fim = inicio + itens_pagina
+    registros_pagina = registros_filtrados[inicio:fim]
 
-# ── Gerador de link ─────────────────────────────────────────────────────────
-with st.expander("🔗 Gerar link para fornecedor", expanded=False):
-    lg1, lg2, lg3 = st.columns([2, 1, 2])
-    with lg1:
-        link_po = st.text_input("PO com Release", key="gerador_link_po", placeholder="4133600-23")
-    with lg2:
-        link_linha = st.text_input("Linha", key="gerador_link_linha", placeholder="17")
-    with lg3:
-        form_base_url = st.text_input(
-            "URL do formulário",
-            value=FORM_BASE_URL_PADRAO,
-            help="Em produção, use a URL pública do formulário.",
+    if registros_pagina:
+        df = registros_para_dataframe(registros_pagina)
+        st.dataframe(aplicar_destaque(df), use_container_width=True, hide_index=True)
+
+        excel_bytes = gerar_excel(registros_filtrados)
+        nome_arquivo = f"fornecedores_{agora.strftime('%Y%m%d_%H%M%S')}.xlsx"
+        st.download_button(
+            label="📥 Exportar Excel (todos filtrados)",
+            data=excel_bytes,
+            file_name=nome_arquivo,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            type="primary",
         )
+    elif registros:
+        st.info("Nenhum registro encontrado com os filtros aplicados.")
+    else:
+        st.info("Nenhum registro encontrado. Envie respostas pelo formulário.")
 
-    if link_po.strip() and link_linha.strip():
-        url_fornecedor = montar_link_formulario(form_base_url, link_po, link_linha)
-        st.code(url_fornecedor, language=None)
-        pedidos = buscar_por_po_e_linha(link_po.strip(), link_linha.strip())
-        if pedidos:
-            fornecedor = pedidos[0].get("fornecedor", "—")
-            st.caption(f"Pedido encontrado no FUP: **{fornecedor}** — copie o link e envie por e-mail.")
-        else:
-            st.warning("PO/linha não encontrados no FUP. Verifique os dados antes de enviar o link.")
-
-# ── Reset de senha (equipe Alcoa — sem e-mail/domínio) ───────────────────────
-with st.expander("🔑 Reset de senha do fornecedor (equipe)", expanded=False):
+with aba_reset:
+    st.subheader("Reset de senha do fornecedor")
     st.markdown(
         """
-        Use quando o fornecedor **esqueceu a senha** e o e-mail automático não está disponível.
+        Use quando o fornecedor **esqueceu a senha**.
         Gere uma senha temporária e envie pelo **Teams / telefone**.
+
+        Depois, no formulário, o fornecedor entra em **Esqueci a senha**,
+        informa a senha temporária e define a senha definitiva.
         """
     )
     try:
@@ -548,7 +670,8 @@ with st.expander("🔑 Reset de senha do fornecedor (equipe)", expanded=False):
                 )
                 st.info(
                     f"Senha temporária (passe ao fornecedor):\n\n`{senha_plain}`\n\n"
-                    "No próximo login o sistema **obriga** a trocar essa senha antes de usar o formulário."
+                    "Peça para abrir **Esqueci a senha** no formulário, "
+                    "usar esta senha temporária e criar a senha definitiva."
                 )
                 if conta_antes and conta_antes.get("email"):
                     st.caption(f"E-mail cadastrado: {conta_antes.get('email')}")
@@ -556,144 +679,3 @@ with st.expander("🔑 Reset de senha do fornecedor (equipe)", expanded=False):
                 st.error(str(exc))
             except Exception as exc:
                 st.error(f"Erro ao redefinir: {exc}")
-
-# ── Exportar retorno (sem alterar o .xlsm) ───────────────────────────────────
-with st.expander("📥 Exportar retorno para Excel (sem mexer na FUP)", expanded=False):
-    st.markdown(
-        """
-        Gera um **Excel novo** com relacionamento:
-
-        - **Verde (pesquisa):** PO com Release + Número da linha  
-        - **Amarelo (retorno):** Data da Promessa, Observações de Coleta, Número da NF  
-
-        **Não altera** o `relatorio_fup.xlsm`. Serve para conferir o match e, se quiser,
-        fazer *PROCV* / Power Query na planilha principal depois.
-        """
-    )
-    if st.button("Gerar Excel de retorno", type="primary", key="btn_export_retorno_fup"):
-        try:
-            resultado = exportar_retorno_fup_excel(registros)
-            caminho = Path(resultado["arquivo"])
-            st.success(
-                f"Arquivo gerado: **{caminho.name}** · "
-                f"Match na FUP: **{resultado['encontrados']}** · "
-                f"Sem match: **{resultado['nao_encontrados']}**"
-            )
-            st.download_button(
-                label="⬇️ Baixar Excel de retorno",
-                data=caminho.read_bytes(),
-                file_name=caminho.name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="dl_retorno_fup",
-            )
-            st.caption(f"Também salvo na pasta do projeto: `{caminho.name}`")
-        except Exception as exc:
-            st.error(f"Erro ao gerar Excel: {exc}")
-
-# ── Filtros ─────────────────────────────────────────────────────────────────
-st.subheader("Filtros")
-
-busca_geral = st.text_input(
-    "🔎 Busca geral",
-    placeholder="Procura em todos os campos...",
-)
-
-f1, f2, f3, f4 = st.columns(4)
-with f1:
-    filtro_nome = st.text_input("Nome")
-with f2:
-    filtro_email = st.text_input("Email")
-with f3:
-    filtro_po = st.text_input("PO com Release")
-with f4:
-    filtro_linha = st.text_input("Linha")
-
-f5, f6, f7, f8 = st.columns(4)
-with f5:
-    filtro_nf = st.text_input("Número da NF")
-with f6:
-    usar_filtro_data = st.checkbox("Filtrar por Data da Promessa")
-    filtro_data = None
-    if usar_filtro_data:
-        filtro_data = st.date_input("Data da Promessa", format="DD/MM/YYYY")
-with f7:
-    somente_incompletos = st.checkbox(
-        "⚠️ Só incompletos",
-        help="Exibe apenas registros sem NF ou sem observação de coleta.",
-    )
-    filtro_prazo = st.selectbox(
-        "Prazo do form",
-        ["Todos", "No prazo", "Atrasado", "Sem prazo", "Sem data"],
-        help="Compara a data do envio com a data limite definida acima.",
-    )
-with f8:
-    itens_pagina = st.selectbox("Registros por página", OPCOES_PAGINA, index=1)
-
-registros_filtrados = aplicar_filtros(
-    registros,
-    filtro_nome,
-    filtro_email,
-    filtro_po,
-    filtro_nf,
-    filtro_linha,
-    busca_geral,
-    filtro_data,
-    somente_incompletos,
-    filtro_prazo,
-)
-
-total_paginas = max(1, (len(registros_filtrados) + itens_pagina - 1) // itens_pagina)
-
-if "pagina_atual" not in st.session_state:
-    st.session_state.pagina_atual = 1
-
-st.session_state.pagina_atual = min(st.session_state.pagina_atual, total_paginas)
-
-m1, m2 = st.columns(2)
-m1.metric("Registros filtrados", len(registros_filtrados))
-m2.metric("Página", f"{st.session_state.pagina_atual} de {total_paginas}")
-
-# ── Paginação ───────────────────────────────────────────────────────────────
-pg1, pg2, pg3 = st.columns([1, 2, 1])
-with pg1:
-    if st.button("← Anterior", disabled=st.session_state.pagina_atual <= 1):
-        st.session_state.pagina_atual -= 1
-        st.rerun()
-with pg2:
-    nova_pagina = st.number_input(
-        "Ir para página",
-        min_value=1,
-        max_value=total_paginas,
-        value=st.session_state.pagina_atual,
-        step=1,
-    )
-    if nova_pagina != st.session_state.pagina_atual:
-        st.session_state.pagina_atual = int(nova_pagina)
-        st.rerun()
-with pg3:
-    if st.button("Próxima →", disabled=st.session_state.pagina_atual >= total_paginas):
-        st.session_state.pagina_atual += 1
-        st.rerun()
-
-inicio = (st.session_state.pagina_atual - 1) * itens_pagina
-fim = inicio + itens_pagina
-registros_pagina = registros_filtrados[inicio:fim]
-
-# ── Tabela ──────────────────────────────────────────────────────────────────
-if registros_pagina:
-    df = registros_para_dataframe(registros_pagina)
-    st.dataframe(aplicar_destaque(df), use_container_width=True, hide_index=True)
-
-    excel_bytes = gerar_excel(registros_filtrados)
-    nome_arquivo = f"fornecedores_{agora.strftime('%Y%m%d_%H%M%S')}.xlsx"
-    st.download_button(
-        label="📥 Exportar Excel (todos filtrados)",
-        data=excel_bytes,
-        file_name=nome_arquivo,
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        type="primary",
-    )
-elif registros:
-    st.info("Nenhum registro encontrado com os filtros aplicados.")
-else:
-    st.info("Nenhum registro encontrado. Envie respostas pelo formulário.")
