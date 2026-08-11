@@ -547,8 +547,8 @@ with st.expander("🔑 Reset de senha do fornecedor (equipe)", expanded=False):
                     f"{', usuário **' + str(conta_ok.get('usuario') or '') + '**' if conta_ok.get('usuario') else ''})."
                 )
                 st.info(
-                    f"Senha temporária (passe ao fornecedor e peça para trocar no próximo acesso):\n\n"
-                    f"`{senha_plain}`"
+                    f"Senha temporária (passe ao fornecedor):\n\n`{senha_plain}`\n\n"
+                    "No próximo login o sistema **obriga** a trocar essa senha antes de usar o formulário."
                 )
                 if conta_antes and conta_antes.get("email"):
                     st.caption(f"E-mail cadastrado: {conta_antes.get('email')}")

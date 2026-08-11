@@ -14,6 +14,7 @@ from contas_fornecedor import (
     SENHA_VALIDADE_DIAS,
     autenticar_conta,
     conta_bloqueada,
+    conta_deve_trocar_senha,
     criar_conta,
     dias_para_expirar,
     garantir_arquivo_contas,
@@ -205,13 +206,19 @@ def _apos_senha_ok(info: dict[str, str], conta: dict) -> None:
     limpar_falhas_login(info["codigo_fornecedor"])
     _iniciar_sessao_parcial(info)
 
-    if senha_expirada(conta):
+    if conta_deve_trocar_senha(conta) or senha_expirada(conta):
         st.session_state.forcar_troca_senha = True
         st.session_state.auth_tela = "redefinir"
-        st.session_state.auth_msg = (
-            f"Sua senha expirou (política de {SENHA_VALIDADE_DIAS} dias). "
-            "Defina uma nova senha para continuar."
-        )
+        if conta_deve_trocar_senha(conta):
+            st.session_state.auth_msg = (
+                "Você entrou com uma senha temporária. "
+                "Defina uma nova senha para continuar."
+            )
+        else:
+            st.session_state.auth_msg = (
+                f"Sua senha expirou (política de {SENHA_VALIDADE_DIAS} dias). "
+                "Defina uma nova senha para continuar."
+            )
         st.rerun()
         return
 
@@ -429,7 +436,7 @@ def _render_tela_login_form() -> None:
 
 
 def _render_tela_redefinir() -> None:
-    """Só usada na troca obrigatória (senha expirada) — ainda exige senha atual."""
+    """Troca obrigatória após senha temporária/expirada — não pede senha atual."""
     forcar = bool(st.session_state.get("forcar_troca_senha"))
     if not forcar:
         # Alterar senha sem estar logado = recuperação por e-mail (sem senha atual)
@@ -439,9 +446,9 @@ def _render_tela_redefinir() -> None:
     st.markdown(
         """
         <div class="login-box">
-            <h2>🔄 Troca obrigatória de senha</h2>
-            <p>Sua senha expirou. Informe a <strong>senha atual</strong>
-            e a <strong>nova senha</strong> (mín. 8, letra e número).</p>
+            <h2>🔄 Defina sua nova senha</h2>
+            <p>Por segurança, escolha uma <strong>nova senha</strong>
+            (mín. 8 caracteres, com letra e número) antes de continuar.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -451,17 +458,17 @@ def _render_tela_redefinir() -> None:
         st.warning(st.session_state.auth_msg)
         st.session_state.pop("auth_msg", None)
 
+    codigo_fix = _codigo_preferido() or codigo_atual()
     with st.form("form_redefinir_senha"):
-        codigo = st.text_input(
+        st.text_input(
             "Código do fornecedor",
-            value=_codigo_preferido() or codigo_atual(),
-            placeholder="Ex: 123",
+            value=codigo_fix,
+            disabled=True,
         )
-        senha_atual = st.text_input("Senha atual", type="password")
         nova = st.text_input("Nova senha", type="password")
         confirmar = st.text_input("Confirmar nova senha", type="password")
         salvar = st.form_submit_button(
-            "Salvar nova senha",
+            "Salvar nova senha e entrar",
             type="primary",
             use_container_width=True,
         )
@@ -469,7 +476,7 @@ def _render_tela_redefinir() -> None:
     if not salvar:
         return
 
-    info = resolver_fornecedor_por_codigo(codigo)
+    info = resolver_fornecedor_por_codigo(codigo_fix)
     if not info:
         st.error("Código não encontrado.")
         return
@@ -483,11 +490,13 @@ def _render_tela_redefinir() -> None:
         return
 
     try:
-        redefinir_senha(info["codigo_fornecedor"], nova, senha_atual=senha_atual)
+        # Já autenticou com a senha temporária — troca sem pedir a atual de novo
+        redefinir_senha(info["codigo_fornecedor"], nova, via_otp=True)
         registrar_acesso(
             info["codigo_fornecedor"],
             "senha_redefinida",
             fornecedor=info["fornecedor"],
+            detalhes="apos_temporaria_ou_expirada",
         )
     except ValueError as exc:
         st.error(str(exc))

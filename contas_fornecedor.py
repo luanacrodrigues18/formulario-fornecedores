@@ -399,6 +399,7 @@ def redefinir_senha(
     *,
     senha_atual: str | None = None,
     via_otp: bool = False,
+    forcar_proxima_troca: bool = False,
 ) -> dict[str, Any]:
     codigo = str(codigo_fornecedor or "").strip()
     if not codigo:
@@ -423,10 +424,22 @@ def redefinir_senha(
     conta["atualizado_em"] = _agora_iso()
     conta["falhas_login"] = 0
     conta["bloqueado_ate"] = None
-    conta["otp_hash"] = ""
-    conta["otp_expira"] = None
-    conta["otp_tipo"] = ""
+    if forcar_proxima_troca:
+        # Marca troca obrigatória no próximo login (reset admin / senha temporária)
+        conta["otp_hash"] = ""
+        conta["otp_expira"] = None
+        conta["otp_tipo"] = "force_change"
+    else:
+        conta["otp_hash"] = ""
+        conta["otp_expira"] = None
+        conta["otp_tipo"] = ""
     return _gravar_conta(conta)
+
+
+def conta_deve_trocar_senha(conta: dict[str, Any] | None) -> bool:
+    if not conta:
+        return False
+    return str(conta.get("otp_tipo") or "") == "force_change"
 
 
 def gerar_senha_temporaria(tamanho: int = 10) -> str:
@@ -469,6 +482,7 @@ def redefinir_senha_admin(
         conta["codigo_fornecedor"],
         senha,
         via_otp=True,
+        forcar_proxima_troca=True,
     )
     registrar_acesso(
         conta["codigo_fornecedor"],
