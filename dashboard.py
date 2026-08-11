@@ -60,6 +60,16 @@ LARGURAS_COLUNAS = [8, 18, 22, 22, 30, 25, 28, 18, 35, 18, 22]
 COL_NF = COLUNAS_EXIBICAO["numero_nf"]
 COL_OBS = COLUNAS_EXIBICAO["observacoes_coleta"]
 OPCOES_PAGINA = [10, 25, 50, 100]
+OPCOES_PERIODO = [
+    "Todo o histórico",
+    "Hoje",
+    "Ontem",
+    "Últimos 7 dias",
+    "Últimos 15 dias",
+    "Mês atual",
+    "Mês anterior",
+    "Personalizado",
+]
 
 
 def _parse_datetime(valor) -> datetime | None:
@@ -72,6 +82,64 @@ def _datetime_fallback() -> datetime:
 
 def _valor_vazio(valor) -> bool:
     return valor_vazio(valor)
+
+
+def resolver_periodo(
+    opcao: str,
+    data_ini: date | None = None,
+    data_fim: date | None = None,
+) -> tuple[date | None, date | None, str]:
+    """Retorna (início, fim, rótulo). None/None = sem filtro de data."""
+    hoje = agora_brasil().date()
+    if opcao == "Todo o histórico":
+        return None, None, "Todo o histórico"
+    if opcao == "Hoje":
+        return hoje, hoje, f"Hoje ({hoje.strftime('%d/%m/%Y')})"
+    if opcao == "Ontem":
+        ontem = hoje - timedelta(days=1)
+        return ontem, ontem, f"Ontem ({ontem.strftime('%d/%m/%Y')})"
+    if opcao == "Últimos 7 dias":
+        ini = hoje - timedelta(days=6)
+        return ini, hoje, f"Últimos 7 dias ({ini.strftime('%d/%m/%Y')} a {hoje.strftime('%d/%m/%Y')})"
+    if opcao == "Últimos 15 dias":
+        ini = hoje - timedelta(days=14)
+        return ini, hoje, f"Últimos 15 dias ({ini.strftime('%d/%m/%Y')} a {hoje.strftime('%d/%m/%Y')})"
+    if opcao == "Mês atual":
+        ini = hoje.replace(day=1)
+        return ini, hoje, f"Mês atual ({ini.strftime('%d/%m/%Y')} a {hoje.strftime('%d/%m/%Y')})"
+    if opcao == "Mês anterior":
+        primeiro_mes = hoje.replace(day=1)
+        fim = primeiro_mes - timedelta(days=1)
+        ini = fim.replace(day=1)
+        return ini, fim, f"Mês anterior ({ini.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')})"
+    # Personalizado
+    if data_ini is None and data_fim is None:
+        return None, None, "Personalizado (sem datas)"
+    ini = data_ini or data_fim or hoje
+    fim = data_fim or data_ini or hoje
+    if ini > fim:
+        ini, fim = fim, ini
+    return ini, fim, f"Personalizado ({ini.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')})"
+
+
+def filtrar_por_periodo(
+    registros: list[dict],
+    data_ini: date | None,
+    data_fim: date | None,
+) -> list[dict]:
+    if data_ini is None and data_fim is None:
+        return list(registros)
+    ini = data_ini or date.min
+    fim = data_fim or date.max
+    filtrados = []
+    for r in registros:
+        dt = _parse_datetime(r.get("hora_conclusao"))
+        if not dt:
+            continue
+        d = dt.date()
+        if ini <= d <= fim:
+            filtrados.append(r)
+    return filtrados
 
 
 def ordenar_por_data(registros: list[dict]) -> list[dict]:
@@ -248,15 +316,70 @@ def aplicar_filtros(
 
 
 def grafico_envios_por_dia(registros: list[dict]) -> pd.DataFrame:
-    hoje = agora_brasil().date()
-    dias = [hoje - timedelta(days=i) for i in range(6, -1, -1)]
-    contagem = {d.strftime("%d/%m"): 0 for d in dias}
+    return grafico_envios_periodo(registros)
 
+
+def grafico_envios_periodo(
+    registros: list[dict],
+    data_ini: date | None = None,
+    data_fim: date | None = None,
+) -> pd.DataFrame:
+    """Barras diárias no intervalo; se > 45 dias, agrupa por semana."""
+    hoje = agora_brasil().date()
+    if data_ini is None and data_fim is None:
+        datas_reg = [
+            d.date()
+            for r in registros
+            if (d := _parse_datetime(r.get("hora_conclusao")))
+        ]
+        if datas_reg:
+            data_ini = min(datas_reg)
+            data_fim = max(datas_reg)
+            # limita visão "todo histórico" a 30 dias finais se for longo demais
+            if (data_fim - data_ini).days > 30:
+                data_ini = data_fim - timedelta(days=29)
+        else:
+            data_ini = hoje - timedelta(days=6)
+            data_fim = hoje
+    else:
+        data_ini = data_ini or data_fim or hoje
+        data_fim = data_fim or data_ini or hoje
+        if data_ini > data_fim:
+            data_ini, data_fim = data_fim, data_ini
+
+    span = (data_fim - data_ini).days
+    if span > 45:
+        # agrupa por semana (segunda)
+        contagem: dict[str, int] = {}
+        ordem: list[str] = []
+        cursor = data_ini
+        while cursor <= data_fim:
+            semana_ini = cursor - timedelta(days=cursor.weekday())
+            label = f"Sem {semana_ini.strftime('%d/%m')}"
+            if label not in contagem:
+                contagem[label] = 0
+                ordem.append(label)
+            cursor += timedelta(days=7)
+        for registro in registros:
+            dt = _parse_datetime(registro.get("hora_conclusao"))
+            if not dt:
+                continue
+            d = dt.date()
+            if data_ini <= d <= data_fim:
+                semana_ini = d - timedelta(days=d.weekday())
+                label = f"Sem {semana_ini.strftime('%d/%m')}"
+                if label in contagem:
+                    contagem[label] += 1
+        return pd.DataFrame(
+            {"Dia": ordem, "Envios": [contagem[k] for k in ordem]}
+        )
+
+    dias = [data_ini + timedelta(days=i) for i in range(span + 1)]
+    contagem = {d.strftime("%d/%m"): 0 for d in dias}
     for registro in registros:
         dt = _parse_datetime(registro.get("hora_conclusao"))
-        if dt and dt.date() in dias:
+        if dt and data_ini <= dt.date() <= data_fim:
             contagem[dt.strftime("%d/%m")] += 1
-
     return pd.DataFrame({"Dia": list(contagem.keys()), "Envios": list(contagem.values())})
 
 
@@ -424,24 +547,31 @@ def _pdf_lista_pendencias(registros: list[dict], limite: int = 30) -> list[dict]
     return pendencias[:limite]
 
 
-def _pdf_dados_relatorio(registros: list[dict]) -> dict:
+def _pdf_dados_relatorio(
+    registros: list[dict],
+    *,
+    periodo_label: str = "Todo o histórico",
+    data_ini: date | None = None,
+    data_fim: date | None = None,
+) -> dict:
     agora_local = agora_brasil()
     limite = data_limite_atual()
     contagem = contar_por_prazo(registros, limite)
     incompletos = sum(1 for r in registros if registro_incompleto(r))
     top = grafico_top_fornecedores(registros).sort_values("Envios", ascending=False)
     df_prazo = grafico_status_prazo(registros)
-    df_7d = grafico_envios_por_dia(registros)
+    df_periodo = grafico_envios_periodo(registros, data_ini, data_fim)
     ultimo_dt = ultimo_envio(registros)
     pendencias = _pdf_lista_pendencias(registros)
     return {
         "agora": agora_local,
+        "periodo_label": periodo_label,
         "limite": limite,
         "contagem": contagem,
         "incompletos": incompletos,
         "top": top,
         "df_prazo": df_prazo,
-        "df_7d": df_7d,
+        "df_periodo": df_periodo,
         "pendencias": pendencias,
         "pendencias_total": incompletos,
         "ultimo": ultimo_dt,
@@ -461,13 +591,13 @@ def _pdf_simples_texto(dados: dict) -> bytes:
     linhas = [
         "Relatorio Dashboard - Fornecedores Alcoa",
         f"Gerado em: {dados['agora'].strftime('%d/%m/%Y %H:%M')} (Brasilia)",
+        f"Periodo: {dados.get('periodo_label', 'Todo o historico')}",
         "",
         "Resumo geral",
         f"Total de retornos: {dados['total']}",
-        f"Envios hoje: {dados['hoje']}",
-        f"Ultimos 7 dias: {dados['semana']}",
-        f"Sem Numero da NF: {dados['sem_nf']}",
+        f"Completos: {max(dados['total'] - dados['incompletos'], 0)}",
         f"Incompletos: {dados['incompletos']}",
+        f"Sem Numero da NF: {dados['sem_nf']}",
     ]
     if dados["ultimo"]:
         linhas.append(f"Ultimo envio: {dados['ultimo'].strftime('%d/%m/%Y %H:%M')}")
@@ -476,12 +606,12 @@ def _pdf_simples_texto(dados: dict) -> bytes:
         linhas.append(f"No prazo: {dados['contagem'].get('No prazo', 0)}")
         linhas.append(f"Atrasado: {dados['contagem'].get('Atrasado', 0)}")
 
-    linhas.extend(["", "Envios dos ultimos 7 dias"])
-    df_7d = dados["df_7d"]
-    if df_7d.empty:
+    linhas.extend(["", "Envios no periodo"])
+    df_periodo = dados.get("df_periodo")
+    if df_periodo is None or df_periodo.empty:
         linhas.append("Sem envios no periodo.")
     else:
-        for _, row in df_7d.iterrows():
+        for _, row in df_periodo.iterrows():
             linhas.append(f"- {row['Dia']}: {int(row['Envios'])}")
 
     linhas.extend(["", "Status do prazo"])
@@ -555,9 +685,20 @@ def _pdf_simples_texto(dados: dict) -> bytes:
     return bytes(out)
 
 
-def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
+def gerar_pdf_relatorio(
+    registros: list[dict],
+    *,
+    periodo_label: str = "Todo o histórico",
+    data_ini: date | None = None,
+    data_fim: date | None = None,
+) -> bytes:
     """Relatório PDF formatado (métricas, tabelas e rodapé) para reunião."""
-    dados = _pdf_dados_relatorio(registros)
+    dados = _pdf_dados_relatorio(
+        registros,
+        periodo_label=periodo_label,
+        data_ini=data_ini,
+        data_fim=data_fim,
+    )
     try:
         from fpdf import FPDF
     except Exception:
@@ -672,16 +813,37 @@ def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
             new_x="LMARGIN",
             new_y="NEXT",
         )
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(*AZUL)
+        pdf.cell(
+            0,
+            6,
+            _pdf_safe(f"Período: {dados.get('periodo_label', 'Todo o histórico')}"),
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
 
         secao(pdf, "1. Resumo geral")
         y0 = pdf.get_y()
         box_w, box_h, gap = 35.5, 18, 2.5
         kpis = [
-            ("Total de retornos", str(dados["total"]), AZUL),
-            ("Envios hoje", str(dados["hoje"]), AZUL),
-            ("Últimos 7 dias", str(dados["semana"]), AZUL),
+            ("Total no período", str(dados["total"]), AZUL),
+            (
+                "Completos",
+                str(max(dados["total"] - dados["incompletos"], 0)),
+                VERDE,
+            ),
+            (
+                "Incompletos",
+                str(dados["incompletos"]),
+                VERMELHO if dados["incompletos"] else VERDE,
+            ),
             ("Sem Número da NF", str(dados["sem_nf"]), VERMELHO if dados["sem_nf"] else AZUL),
-            ("Incompletos", str(dados["incompletos"]), VERMELHO if dados["incompletos"] else VERDE),
+            (
+                "Último envio",
+                dados["ultimo"].strftime("%d/%m %H:%M") if dados["ultimo"] else "-",
+                AZUL,
+            ),
         ]
         for i, (lab, val, cor) in enumerate(kpis):
             kpi_box(pdf, 14 + i * (box_w + gap), y0, box_w, box_h, lab, val, cor)
@@ -706,15 +868,17 @@ def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
                 new_y="NEXT",
             )
 
-        secao(pdf, "2. Envios dos últimos 7 dias")
-        df_7d = dados["df_7d"]
-        if df_7d.empty:
+        secao(pdf, "2. Envios no período")
+        df_periodo = dados.get("df_periodo")
+        if df_periodo is None or df_periodo.empty:
             pdf.set_font("Helvetica", "I", 9)
             pdf.set_text_color(*CINZA)
             pdf.cell(0, 6, _pdf_safe("Sem envios no período."), new_x="LMARGIN", new_y="NEXT")
         else:
-            rows_7d = [[str(r["Dia"]), str(int(r["Envios"]))] for _, r in df_7d.iterrows()]
-            tabela(pdf, ["Dia", "Envios"], rows_7d, [90, 92])
+            rows_periodo = [
+                [str(r["Dia"]), str(int(r["Envios"]))] for _, r in df_periodo.iterrows()
+            ]
+            tabela(pdf, ["Dia / semana", "Envios"], rows_periodo, [90, 92])
 
         secao(pdf, "3. Status do prazo")
         if dados["limite"]:
@@ -863,14 +1027,12 @@ if supabase_configurado():
         pass
 
 try:
-    registros = ordenar_por_data(buscar_todos())
+    registros_todos = ordenar_por_data(buscar_todos())
 except Exception as exc:
     st.error(f"Erro ao buscar registros: {exc}")
     st.stop()
 
-ultimo = ultimo_envio(registros)
 limite_atual = data_limite_atual()
-contagem_prazo = contar_por_prazo(registros, limite_atual)
 
 st.caption(
     f"Última leitura: {agora.strftime('%d/%m/%Y %H:%M:%S')} (horário de Brasília)"
@@ -889,12 +1051,56 @@ aba_dash, aba_tabela, aba_reset = st.tabs(
 )
 
 with aba_dash:
+    st.subheader("Período do relatório")
+    st.caption(
+        "Escolha o intervalo para métricas, gráficos e PDF "
+        "(semanal, quinzenal, mensal ou personalizado)."
+    )
+    col_periodo, col_datas = st.columns([2, 3])
+    with col_periodo:
+        opcao_periodo = st.selectbox(
+            "Intervalo",
+            OPCOES_PERIODO,
+            index=3,  # Últimos 7 dias por padrão
+            key="periodo_dash",
+        )
+    data_ini_ui = None
+    data_fim_ui = None
+    with col_datas:
+        if opcao_periodo == "Personalizado":
+            hoje_ui = agora.date()
+            faixa = st.date_input(
+                "De / até",
+                value=(hoje_ui - timedelta(days=6), hoje_ui),
+                format="DD/MM/YYYY",
+                key="periodo_personalizado",
+            )
+            if isinstance(faixa, (tuple, list)) and len(faixa) == 2:
+                data_ini_ui, data_fim_ui = faixa[0], faixa[1]
+            elif isinstance(faixa, date):
+                data_ini_ui = data_fim_ui = faixa
+
+    data_ini, data_fim, periodo_label = resolver_periodo(
+        opcao_periodo, data_ini_ui, data_fim_ui
+    )
+    registros_periodo = filtrar_por_periodo(registros_todos, data_ini, data_fim)
+    ultimo = ultimo_envio(registros_periodo)
+    contagem_prazo = contar_por_prazo(registros_periodo, limite_atual)
+
+    st.info(
+        f"**Período ativo:** {periodo_label}  ·  "
+        f"**{len(registros_periodo)}** retorno(s)  ·  "
+        f"base total: {len(registros_todos)}"
+    )
+
     st.subheader("Métricas")
+    incompletos_periodo = sum(1 for r in registros_periodo if registro_incompleto(r))
+    completos_periodo = max(len(registros_periodo) - incompletos_periodo, 0)
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Total geral", len(registros))
-    c2.metric("Envios hoje", contar_envios_hoje(registros))
-    c3.metric("Últimos 7 dias", contar_envios_semana(registros))
-    c4.metric("Sem Número da NF", contar_sem_nf(registros))
+    c1.metric("Total no período", len(registros_periodo))
+    c2.metric("Completos", completos_periodo)
+    c3.metric("Incompletos", incompletos_periodo)
+    c4.metric("Sem Número da NF", contar_sem_nf(registros_periodo))
     c5.metric(
         "Último envio",
         ultimo.strftime("%d/%m %H:%M") if ultimo else "—",
@@ -909,11 +1115,18 @@ with aba_dash:
     col_pdf, _ = st.columns([1, 3])
     with col_pdf:
         try:
-            pdf_bytes = gerar_pdf_relatorio(registros)
+            pdf_bytes = gerar_pdf_relatorio(
+                registros_periodo,
+                periodo_label=periodo_label,
+                data_ini=data_ini,
+                data_fim=data_fim,
+            )
             st.download_button(
                 "📄 Exportar relatório PDF",
                 data=pdf_bytes,
-                file_name=f"relatorio_fornecedores_{agora.strftime('%Y%m%d_%H%M')}.pdf",
+                file_name=(
+                    f"relatorio_fornecedores_{agora.strftime('%Y%m%d_%H%M')}.pdf"
+                ),
                 mime="application/pdf",
                 use_container_width=True,
                 type="primary",
@@ -922,38 +1135,48 @@ with aba_dash:
         except Exception as exc:
             st.warning(f"PDF indisponível: {exc}")
 
-    if registros:
+    if registros_periodo:
         g1, g2 = st.columns(2)
         with g1:
-            st.subheader("Envios por dia (7 dias)")
-            df_dias = grafico_envios_por_dia(registros)
+            titulo_envio = (
+                "Envios no período"
+                if data_ini or data_fim
+                else "Envios (últimos dias do histórico)"
+            )
+            st.subheader(titulo_envio)
+            df_dias = grafico_envios_periodo(registros_periodo, data_ini, data_fim)
             st.altair_chart(_chart_envios_por_dia(df_dias), use_container_width=True)
         with g2:
             st.subheader("Top 10 fornecedores")
-            df_top = grafico_top_fornecedores(registros)
+            df_top = grafico_top_fornecedores(registros_periodo)
             st.altair_chart(_chart_top_fornecedores(df_top), use_container_width=True)
 
         g3, g4 = st.columns(2)
         with g3:
             st.subheader("Status do prazo")
-            df_prazo = grafico_status_prazo(registros)
+            df_prazo = grafico_status_prazo(registros_periodo)
             st.altair_chart(
                 _chart_pizza(df_prazo, "Status", "Qtd", "Distribuição por prazo"),
                 use_container_width=True,
             )
         with g4:
             st.subheader("Completude do retorno")
-            df_comp = grafico_completude(registros)
+            df_comp = grafico_completude(registros_periodo)
             st.altair_chart(
                 _chart_pizza(df_comp, "Situação", "Qtd", "Completos x incompletos"),
                 use_container_width=True,
             )
 
-        st.subheader("Tendência (30 dias)")
-        df_30 = grafico_envios_30_dias(registros)
-        st.altair_chart(_chart_barras_periodo(df_30), use_container_width=True)
+        # Tendência longa só faz sentido no histórico amplo
+        if opcao_periodo == "Todo o histórico":
+            st.subheader("Tendência (30 dias)")
+            df_30 = grafico_envios_30_dias(registros_todos)
+            st.altair_chart(_chart_barras_periodo(df_30), use_container_width=True)
     else:
-        st.info("Nenhum registro ainda para exibir gráficos.")
+        st.info("Nenhum retorno neste período. Ajuste o intervalo acima.")
+
+# Tabela usa a base completa (filtros próprios abaixo)
+registros = registros_todos
 
 with aba_tabela:
     st.subheader("Filtros e tabela")
