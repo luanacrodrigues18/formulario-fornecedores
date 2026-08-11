@@ -407,6 +407,23 @@ def _pdf_safe(texto: str) -> str:
     return str(texto).encode("latin-1", errors="replace").decode("latin-1")
 
 
+def _pdf_lista_pendencias(registros: list[dict], limite: int = 30) -> list[dict]:
+    """Retornos incompletos / sem NF, mais recentes primeiro."""
+    pendencias = []
+    for r in registros:
+        if not registro_incompleto(r):
+            continue
+        dt = _parse_datetime(r.get("hora_conclusao"))
+        pendencias.append(
+            {
+                "nome": str(r.get("nome") or "-").strip() or "-",
+                "data": dt.strftime("%d/%m/%Y %H:%M") if dt else "-",
+                "motivo": status_registro(r),
+            }
+        )
+    return pendencias[:limite]
+
+
 def _pdf_dados_relatorio(registros: list[dict]) -> dict:
     agora_local = agora_brasil()
     limite = data_limite_atual()
@@ -414,7 +431,9 @@ def _pdf_dados_relatorio(registros: list[dict]) -> dict:
     incompletos = sum(1 for r in registros if registro_incompleto(r))
     top = grafico_top_fornecedores(registros).sort_values("Envios", ascending=False)
     df_prazo = grafico_status_prazo(registros)
+    df_7d = grafico_envios_por_dia(registros)
     ultimo_dt = ultimo_envio(registros)
+    pendencias = _pdf_lista_pendencias(registros)
     return {
         "agora": agora_local,
         "limite": limite,
@@ -422,6 +441,9 @@ def _pdf_dados_relatorio(registros: list[dict]) -> dict:
         "incompletos": incompletos,
         "top": top,
         "df_prazo": df_prazo,
+        "df_7d": df_7d,
+        "pendencias": pendencias,
+        "pendencias_total": incompletos,
         "ultimo": ultimo_dt,
         "total": len(registros),
         "hoje": contar_envios_hoje(registros),
@@ -454,6 +476,14 @@ def _pdf_simples_texto(dados: dict) -> bytes:
         linhas.append(f"No prazo: {dados['contagem'].get('No prazo', 0)}")
         linhas.append(f"Atrasado: {dados['contagem'].get('Atrasado', 0)}")
 
+    linhas.extend(["", "Envios dos ultimos 7 dias"])
+    df_7d = dados["df_7d"]
+    if df_7d.empty:
+        linhas.append("Sem envios no periodo.")
+    else:
+        for _, row in df_7d.iterrows():
+            linhas.append(f"- {row['Dia']}: {int(row['Envios'])}")
+
     linhas.extend(["", "Status do prazo"])
     df_prazo = dados["df_prazo"]
     if df_prazo.empty:
@@ -470,13 +500,24 @@ def _pdf_simples_texto(dados: dict) -> bytes:
         for _, row in top.head(10).iterrows():
             linhas.append(f"- {str(row['Fornecedor'])[:70]}: {int(row['Envios'])}")
 
+    linhas.extend(["", "Pendencias (incompletos / sem NF)"])
+    pendencias = dados["pendencias"]
+    if not pendencias:
+        linhas.append("Nenhuma pendencia no momento.")
+    else:
+        total_p = dados["pendencias_total"]
+        if total_p > len(pendencias):
+            linhas.append(f"Exibindo {len(pendencias)} de {total_p} pendencias:")
+        for p in pendencias:
+            linhas.append(f"- {p['nome'][:50]} | {p['data']} | {p['motivo']}")
+
     y = 780
-    content = ["BT", "/F1 11 Tf", "50 780 Td"]
+    content = ["BT", "/F1 10 Tf", "50 780 Td"]
     first = True
     for raw in linhas:
         if not first:
-            content.append("0 -15 Td")
-            y -= 15
+            content.append("0 -13 Td")
+            y -= 13
         first = False
         if y < 50:
             break
@@ -541,7 +582,7 @@ def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
             self.cell(0, 8, _pdf_safe("Painel Alcoa - Fornecedores"), align="L")
             self.set_xy(14, 16)
             self.set_font("Helvetica", "", 9)
-            self.cell(0, 6, _pdf_safe("Relatorio de metricas e retornos"), align="L")
+            self.cell(0, 6, _pdf_safe("Relatório de métricas e retornos"), align="L")
             self.set_y(34)
 
         def footer(self) -> None:
@@ -555,7 +596,7 @@ def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
                 0,
                 8,
                 _pdf_safe(
-                    f"Gerado em {dados['agora'].strftime('%d/%m/%Y %H:%M')} (Brasilia)  |  Pagina {self.page_no()}"
+                    f"Gerado em {dados['agora'].strftime('%d/%m/%Y %H:%M')} (Brasília)  |  Página {self.page_no()}"
                 ),
                 align="C",
             )
@@ -626,7 +667,7 @@ def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
             0,
             6,
             _pdf_safe(
-                f"Documento para reuniao · {dados['agora'].strftime('%d/%m/%Y %H:%M')} (horario de Brasilia)"
+                f"Documento para reunião · {dados['agora'].strftime('%d/%m/%Y %H:%M')} (horário de Brasília)"
             ),
             new_x="LMARGIN",
             new_y="NEXT",
@@ -638,8 +679,8 @@ def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
         kpis = [
             ("Total de retornos", str(dados["total"]), AZUL),
             ("Envios hoje", str(dados["hoje"]), AZUL),
-            ("Ultimos 7 dias", str(dados["semana"]), AZUL),
-            ("Sem Numero da NF", str(dados["sem_nf"]), VERMELHO if dados["sem_nf"] else AZUL),
+            ("Últimos 7 dias", str(dados["semana"]), AZUL),
+            ("Sem Número da NF", str(dados["sem_nf"]), VERMELHO if dados["sem_nf"] else AZUL),
             ("Incompletos", str(dados["incompletos"]), VERMELHO if dados["incompletos"] else VERDE),
         ]
         for i, (lab, val, cor) in enumerate(kpis):
@@ -652,7 +693,7 @@ def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
             pdf.cell(
                 0,
                 5,
-                _pdf_safe(f"Ultimo envio: {dados['ultimo'].strftime('%d/%m/%Y %H:%M')}"),
+                _pdf_safe(f"Último envio: {dados['ultimo'].strftime('%d/%m/%Y %H:%M')}"),
                 new_x="LMARGIN",
                 new_y="NEXT",
             )
@@ -660,12 +701,22 @@ def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
             pdf.cell(
                 0,
                 5,
-                _pdf_safe(f"Data limite do formulario: {dados['limite'].strftime('%d/%m/%Y')}"),
+                _pdf_safe(f"Data limite do formulário: {dados['limite'].strftime('%d/%m/%Y')}"),
                 new_x="LMARGIN",
                 new_y="NEXT",
             )
 
-        secao(pdf, "2. Status do prazo")
+        secao(pdf, "2. Envios dos últimos 7 dias")
+        df_7d = dados["df_7d"]
+        if df_7d.empty:
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.set_text_color(*CINZA)
+            pdf.cell(0, 6, _pdf_safe("Sem envios no período."), new_x="LMARGIN", new_y="NEXT")
+        else:
+            rows_7d = [[str(r["Dia"]), str(int(r["Envios"]))] for _, r in df_7d.iterrows()]
+            tabela(pdf, ["Dia", "Envios"], rows_7d, [90, 92])
+
+        secao(pdf, "3. Status do prazo")
         if dados["limite"]:
             y1 = pdf.get_y()
             kpi_box(
@@ -709,7 +760,7 @@ def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
             rows_prazo = [[str(r["Status"]), str(int(r["Qtd"]))] for _, r in df_prazo.iterrows()]
             tabela(pdf, ["Status", "Quantidade"], rows_prazo, [140, 42])
 
-        secao(pdf, "3. Top 10 fornecedores (por retornos)")
+        secao(pdf, "4. Top 10 fornecedores (por retornos)")
         top = dados["top"]
         if top.empty:
             pdf.set_font("Helvetica", "I", 9)
@@ -721,6 +772,42 @@ def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
                 nome = str(row["Fornecedor"])[:55]
                 rows_top.append([str(i), nome, str(int(row["Envios"]))])
             tabela(pdf, ["#", "Fornecedor", "Retornos"], rows_top, [12, 140, 30])
+
+        secao(pdf, "5. Pendências (incompletos / sem NF)")
+        pendencias = dados["pendencias"]
+        if not pendencias:
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.set_text_color(*CINZA)
+            pdf.cell(
+                0,
+                6,
+                _pdf_safe("Nenhuma pendência no momento."),
+                new_x="LMARGIN",
+                new_y="NEXT",
+            )
+        else:
+            total_p = dados["pendencias_total"]
+            if total_p > len(pendencias):
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_text_color(*CINZA)
+                pdf.cell(
+                    0,
+                    5,
+                    _pdf_safe(
+                        f"Exibindo as {len(pendencias)} pendências mais recentes de {total_p}."
+                    ),
+                    new_x="LMARGIN",
+                    new_y="NEXT",
+                )
+            rows_pend = [
+                [p["nome"][:42], p["data"], p["motivo"]] for p in pendencias
+            ]
+            tabela(
+                pdf,
+                ["Fornecedor", "Data do envio", "Pendência"],
+                rows_pend,
+                [78, 42, 62],
+            )
 
         pdf.ln(6)
         pdf.set_fill_color(*AZUL_CLARO)
@@ -734,7 +821,7 @@ def gerar_pdf_relatorio(registros: list[dict]) -> bytes:
             4,
             _pdf_safe(
                 "Documento gerado automaticamente pelo painel de fornecedores Alcoa. "
-                "Use este arquivo em reunioes de acompanhamento e follow-up."
+                "Use este arquivo em reuniões de acompanhamento e follow-up."
             ),
         )
 
