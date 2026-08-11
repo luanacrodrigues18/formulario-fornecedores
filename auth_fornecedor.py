@@ -537,9 +537,10 @@ def _render_tela_esqueci() -> None:
     )
 
     if not smtp_configurado():
-        st.warning(
+                st.warning(
             "Recuperação por e-mail indisponível no momento "
-            "(SMTP não configurado). Contate a equipe Alcoa."
+            "(configure RESEND_API_KEY + EMAIL_FROM, ou SMTP). "
+            "Contate a equipe Alcoa."
         )
         if st.button("Voltar para login", use_container_width=True, key="esqueci_smtp_voltar"):
             _ir_para("login", codigo=_codigo_preferido())

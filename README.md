@@ -58,7 +58,18 @@ FORM_BASE_URL=http://localhost:8501
 
 No Streamlit Cloud, use as mesmas chaves em **Secrets**.
 
-Para **Esqueci a senha**, configure também SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TLS`). Sem SMTP, o botão avisa que a recuperação está indisponível.
+Para **Esqueci a senha**, configure e-mail nos Secrets / `.env` (uma das opções):
+
+**Resend (recomendado — só API key):**
+```toml
+RESEND_API_KEY = "re_xxxxx"
+EMAIL_FROM = "onboarding@resend.dev"
+```
+
+**Ou SMTP (Outlook/Gmail):**
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TLS`.
+
+Sem isso, o botão avisa que a recuperação está indisponível.
 
 ## Criar tabelas no Supabase
 
