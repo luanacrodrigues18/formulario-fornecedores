@@ -371,10 +371,9 @@ if supabase_configurado():
 else:
     st.caption("Exibindo respostas salvas em `formulario_respostas.xlsx`.")
 
-aba_dash, aba_export, aba_tabela, aba_reset = st.tabs(
+aba_dash, aba_tabela, aba_reset = st.tabs(
     [
         "📊 Dashboard / métricas",
-        "📥 Exportar retorno Excel",
         "📋 Filtros e tabela",
         "🔑 Reset senha de fornecedor",
     ]
@@ -397,6 +396,23 @@ with aba_dash:
         p1.metric("Retornos no prazo", contagem_prazo.get("No prazo", 0))
         p2.metric("Retornos atrasados", contagem_prazo.get("Atrasado", 0))
         p3.metric("Data limite do form", limite_atual.strftime("%d/%m/%Y"))
+
+    if registros:
+        g1, g2 = st.columns(2)
+        with g1:
+            st.subheader("Envios por dia (7 dias)")
+            df_dias = grafico_envios_por_dia(registros)
+            st.altair_chart(_chart_envios_por_dia(df_dias), use_container_width=True)
+        with g2:
+            st.subheader("Top 10 fornecedores")
+            df_top = grafico_top_fornecedores(registros)
+            st.altair_chart(_chart_top_fornecedores(df_top), use_container_width=True)
+    else:
+        st.info("Nenhum registro ainda para exibir gráficos.")
+
+with aba_tabela:
+    st.subheader("Filtros e tabela")
+    st.caption("Linhas em amarelo = sem NF ou sem observação")
 
     with st.expander(
         "⏰ Prazo para o fornecedor preencher o formulário",
@@ -479,56 +495,38 @@ with aba_dash:
                 limpar_prazo()
                 st.rerun()
 
-    if registros:
-        g1, g2 = st.columns(2)
-        with g1:
-            st.subheader("Envios por dia (7 dias)")
-            df_dias = grafico_envios_por_dia(registros)
-            st.altair_chart(_chart_envios_por_dia(df_dias), use_container_width=True)
-        with g2:
-            st.subheader("Top 10 fornecedores")
-            df_top = grafico_top_fornecedores(registros)
-            st.altair_chart(_chart_top_fornecedores(df_top), use_container_width=True)
-    else:
-        st.info("Nenhum registro ainda para exibir gráficos.")
+    with st.expander("📥 Exportar retorno para Excel (sem mexer na FUP)", expanded=False):
+        st.markdown(
+            """
+            Gera um **Excel novo** com relacionamento:
 
-with aba_export:
-    st.subheader("Exportar retorno para Excel")
-    st.markdown(
-        """
-        Gera um **Excel novo** com relacionamento:
+            - **Verde (pesquisa):** PO com Release + Número da linha
+            - **Amarelo (retorno):** Data da Promessa, Observações de Coleta, Número da NF
 
-        - **Verde (pesquisa):** PO com Release + Número da linha
-        - **Amarelo (retorno):** Data da Promessa, Observações de Coleta, Número da NF
-
-        **Não altera** o `relatorio_fup.xlsm`. Serve para conferir o match e, se quiser,
-        fazer *PROCV* / Power Query na planilha principal depois.
-        """
-    )
-    st.caption(f"Registros disponíveis para exportar: **{len(registros)}**")
-    if st.button("Gerar Excel de retorno", type="primary", key="btn_export_retorno_fup"):
-        try:
-            resultado = exportar_retorno_fup_excel(registros)
-            caminho = Path(resultado["arquivo"])
-            st.success(
-                f"Arquivo gerado: **{caminho.name}** · "
-                f"Match na FUP: **{resultado['encontrados']}** · "
-                f"Sem match: **{resultado['nao_encontrados']}**"
-            )
-            st.download_button(
-                label="⬇️ Baixar Excel de retorno",
-                data=caminho.read_bytes(),
-                file_name=caminho.name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="dl_retorno_fup",
-            )
-            st.caption(f"Também salvo na pasta do projeto: `{caminho.name}`")
-        except Exception as exc:
-            st.error(f"Erro ao gerar Excel: {exc}")
-
-with aba_tabela:
-    st.subheader("Filtros e tabela")
-    st.caption("Linhas em amarelo = sem NF ou sem observação")
+            **Não altera** o `relatorio_fup.xlsm`. Serve para conferir o match e, se quiser,
+            fazer *PROCV* / Power Query na planilha principal depois.
+            """
+        )
+        st.caption(f"Registros disponíveis: **{len(registros)}**")
+        if st.button("Gerar Excel de retorno", type="primary", key="btn_export_retorno_fup"):
+            try:
+                resultado = exportar_retorno_fup_excel(registros)
+                caminho = Path(resultado["arquivo"])
+                st.success(
+                    f"Arquivo gerado: **{caminho.name}** · "
+                    f"Match na FUP: **{resultado['encontrados']}** · "
+                    f"Sem match: **{resultado['nao_encontrados']}**"
+                )
+                st.download_button(
+                    label="⬇️ Baixar Excel de retorno",
+                    data=caminho.read_bytes(),
+                    file_name=caminho.name,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_retorno_fup",
+                )
+                st.caption(f"Também salvo na pasta do projeto: `{caminho.name}`")
+            except Exception as exc:
+                st.error(f"Erro ao gerar Excel: {exc}")
 
     busca_geral = st.text_input(
         "🔎 Busca geral",
@@ -561,7 +559,7 @@ with aba_tabela:
         filtro_prazo = st.selectbox(
             "Prazo do form",
             ["Todos", "No prazo", "Atrasado", "Sem prazo", "Sem data"],
-            help="Compara a data do envio com a data limite definida no Dashboard.",
+            help="Compara a data do envio com a data limite definida acima.",
         )
     with f8:
         itens_pagina = st.selectbox("Registros por página", OPCOES_PAGINA, index=1)
