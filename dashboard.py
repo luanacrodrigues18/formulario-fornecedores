@@ -340,10 +340,6 @@ if auto_atualizar:
         height=0,
     )
 
-aba_dash, aba_reset = st.tabs(
-    ["📊 Dashboard de fornecedores", "🔑 Reset senha de fornecedor"]
-)
-
 agora = agora_brasil()
 
 try:
@@ -351,31 +347,41 @@ try:
 except Exception:
     pass
 
-with aba_dash:
-    st.caption(
-        f"Última leitura: {agora.strftime('%d/%m/%Y %H:%M:%S')} (horário de Brasília) · "
-        "Linhas em amarelo = sem NF ou sem observação"
-    )
-
-    if supabase_configurado():
-        try:
-            criar_tabela()
-            st.caption("Dados carregados do Supabase.")
-        except RuntimeError as exc:
-            st.warning(f"Supabase com erro: {exc}. Tentando exibir dados do Excel.")
-    else:
-        st.info("Exibindo respostas salvas em `formulario_respostas.xlsx`.")
-
+if supabase_configurado():
     try:
-        registros = ordenar_por_data(buscar_todos())
-    except Exception as exc:
-        st.error(f"Erro ao buscar registros: {exc}")
-        st.stop()
+        criar_tabela()
+    except RuntimeError:
+        pass
 
-    ultimo = ultimo_envio(registros)
-    limite_atual = data_limite_atual()
-    contagem_prazo = contar_por_prazo(registros, limite_atual)
+try:
+    registros = ordenar_por_data(buscar_todos())
+except Exception as exc:
+    st.error(f"Erro ao buscar registros: {exc}")
+    st.stop()
 
+ultimo = ultimo_envio(registros)
+limite_atual = data_limite_atual()
+contagem_prazo = contar_por_prazo(registros, limite_atual)
+
+st.caption(
+    f"Última leitura: {agora.strftime('%d/%m/%Y %H:%M:%S')} (horário de Brasília)"
+)
+if supabase_configurado():
+    st.caption("Dados carregados do Supabase.")
+else:
+    st.caption("Exibindo respostas salvas em `formulario_respostas.xlsx`.")
+
+aba_dash, aba_export, aba_tabela, aba_reset = st.tabs(
+    [
+        "📊 Dashboard / métricas",
+        "📥 Exportar retorno Excel",
+        "📋 Filtros e tabela",
+        "🔑 Reset senha de fornecedor",
+    ]
+)
+
+with aba_dash:
+    st.subheader("Métricas")
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Total geral", len(registros))
     c2.metric("Envios hoje", contar_envios_hoje(registros))
@@ -483,40 +489,46 @@ with aba_dash:
             st.subheader("Top 10 fornecedores")
             df_top = grafico_top_fornecedores(registros)
             st.altair_chart(_chart_top_fornecedores(df_top), use_container_width=True)
+    else:
+        st.info("Nenhum registro ainda para exibir gráficos.")
 
-    with st.expander("📥 Exportar retorno para Excel (sem mexer na FUP)", expanded=False):
-        st.markdown(
-            """
-            Gera um **Excel novo** com relacionamento:
+with aba_export:
+    st.subheader("Exportar retorno para Excel")
+    st.markdown(
+        """
+        Gera um **Excel novo** com relacionamento:
 
-            - **Verde (pesquisa):** PO com Release + Número da linha
-            - **Amarelo (retorno):** Data da Promessa, Observações de Coleta, Número da NF
+        - **Verde (pesquisa):** PO com Release + Número da linha
+        - **Amarelo (retorno):** Data da Promessa, Observações de Coleta, Número da NF
 
-            **Não altera** o `relatorio_fup.xlsm`. Serve para conferir o match e, se quiser,
-            fazer *PROCV* / Power Query na planilha principal depois.
-            """
-        )
-        if st.button("Gerar Excel de retorno", type="primary", key="btn_export_retorno_fup"):
-            try:
-                resultado = exportar_retorno_fup_excel(registros)
-                caminho = Path(resultado["arquivo"])
-                st.success(
-                    f"Arquivo gerado: **{caminho.name}** · "
-                    f"Match na FUP: **{resultado['encontrados']}** · "
-                    f"Sem match: **{resultado['nao_encontrados']}**"
-                )
-                st.download_button(
-                    label="⬇️ Baixar Excel de retorno",
-                    data=caminho.read_bytes(),
-                    file_name=caminho.name,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="dl_retorno_fup",
-                )
-                st.caption(f"Também salvo na pasta do projeto: `{caminho.name}`")
-            except Exception as exc:
-                st.error(f"Erro ao gerar Excel: {exc}")
+        **Não altera** o `relatorio_fup.xlsm`. Serve para conferir o match e, se quiser,
+        fazer *PROCV* / Power Query na planilha principal depois.
+        """
+    )
+    st.caption(f"Registros disponíveis para exportar: **{len(registros)}**")
+    if st.button("Gerar Excel de retorno", type="primary", key="btn_export_retorno_fup"):
+        try:
+            resultado = exportar_retorno_fup_excel(registros)
+            caminho = Path(resultado["arquivo"])
+            st.success(
+                f"Arquivo gerado: **{caminho.name}** · "
+                f"Match na FUP: **{resultado['encontrados']}** · "
+                f"Sem match: **{resultado['nao_encontrados']}**"
+            )
+            st.download_button(
+                label="⬇️ Baixar Excel de retorno",
+                data=caminho.read_bytes(),
+                file_name=caminho.name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="dl_retorno_fup",
+            )
+            st.caption(f"Também salvo na pasta do projeto: `{caminho.name}`")
+        except Exception as exc:
+            st.error(f"Erro ao gerar Excel: {exc}")
 
-    st.subheader("Filtros")
+with aba_tabela:
+    st.subheader("Filtros e tabela")
+    st.caption("Linhas em amarelo = sem NF ou sem observação")
 
     busca_geral = st.text_input(
         "🔎 Busca geral",
@@ -549,7 +561,7 @@ with aba_dash:
         filtro_prazo = st.selectbox(
             "Prazo do form",
             ["Todos", "No prazo", "Atrasado", "Sem prazo", "Sem data"],
-            help="Compara a data do envio com a data limite definida acima.",
+            help="Compara a data do envio com a data limite definida no Dashboard.",
         )
     with f8:
         itens_pagina = st.selectbox("Registros por página", OPCOES_PAGINA, index=1)
