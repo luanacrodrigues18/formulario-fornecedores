@@ -68,6 +68,8 @@ def _enviar_resend(destino: str, assunto: str, corpo: str) -> None:
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            # Resend/Cloudflare bloqueia requests sem User-Agent (erro 1010)
+            "User-Agent": "formulario-fornecedores/1.0",
         },
     )
     try:
