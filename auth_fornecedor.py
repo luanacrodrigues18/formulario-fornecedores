@@ -493,25 +493,95 @@ def _render_tela_redefinir() -> None:
 
 
 def _render_tela_esqueci() -> None:
-    """Recuperação sem e-mail: orientar a pedir reset à equipe no dashboard."""
+    """Usa a senha temporária do dashboard e define a senha definitiva."""
     _limpar_estado_reset()
     st.markdown(
         """
         <div class="login-box">
             <h2>🔑 Esqueci a senha</h2>
-            <p>A recuperação automática por e-mail não está disponível no momento.</p>
-            <p>Entre em contato com a <strong>equipe Alcoa</strong> e peça o
-            <strong>reset de senha</strong>. Eles geram uma senha temporária;
-            no próximo login você define a sua nova senha.</p>
+            <p>Se a equipe Alcoa já te passou uma <strong>senha temporária</strong>,
+            informe abaixo e escolha a <strong>sua nova senha</strong>.</p>
+            <p>Ainda não tem senha temporária? Peça o reset à equipe Alcoa
+            (eles geram no dashboard).</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.info(
-        "Informe seu **usuário** ou **código Alcoa** à equipe para agilizar o atendimento."
-    )
-    if st.button("Voltar para login", type="primary", use_container_width=True, key="esqueci_voltar"):
+
+    if st.session_state.get("auth_msg"):
+        st.info(st.session_state.auth_msg)
+        st.session_state.pop("auth_msg", None)
+
+    with st.form("form_esqueci_temp"):
+        login = st.text_input(
+            "Usuário ou código Alcoa",
+            value=_codigo_preferido(),
+            placeholder="Ex: compras.ars ou 123",
+        )
+        senha_temp = st.text_input(
+            "Senha temporária (recebida da Alcoa)",
+            type="password",
+        )
+        nova = st.text_input("Nova senha", type="password")
+        confirmar = st.text_input("Confirmar nova senha", type="password")
+        salvar = st.form_submit_button(
+            "Salvar nova senha",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if st.button("Voltar para login", use_container_width=True, key="esqueci_voltar"):
         _ir_para("login", codigo=_codigo_preferido())
+
+    if not salvar:
+        return
+
+    conta = obter_conta_por_login(login)
+    if not conta:
+        st.error("Usuário/código não encontrado.")
+        return
+
+    info = {
+        "codigo_fornecedor": conta["codigo_fornecedor"],
+        "fornecedor": conta["fornecedor"],
+    }
+
+    if conta_bloqueada(conta):
+        mins = minutos_bloqueio_restantes(conta)
+        st.error(f"Conta temporariamente bloqueada. Tente de novo em ~{mins} minuto(s).")
+        return
+
+    if not autenticar_conta(info["codigo_fornecedor"], senha_temp):
+        _tratar_falha_login(info)
+        return
+
+    erro = _validar_senha_nova(nova, confirmar)
+    if erro:
+        st.error(erro)
+        return
+
+    if senha_temp.strip() == nova.strip():
+        st.error("A nova senha deve ser diferente da senha temporária.")
+        return
+
+    try:
+        redefinir_senha(info["codigo_fornecedor"], nova, via_otp=True)
+        registrar_acesso(
+            info["codigo_fornecedor"],
+            "senha_redefinida",
+            fornecedor=info["fornecedor"],
+            detalhes="via_senha_temporaria_esqueci",
+        )
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+
+    limpar_falhas_login(info["codigo_fornecedor"])
+    _ir_para(
+        "login",
+        msg="Senha alterada! Entre com a sua nova senha.",
+        codigo=str(conta.get("usuario") or info["codigo_fornecedor"]),
+    )
 
 
 def _render_tela_2fa() -> None:
