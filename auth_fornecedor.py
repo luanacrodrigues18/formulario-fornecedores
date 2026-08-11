@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import os
-from time import time
 
 import streamlit as st
 
 from contas_fornecedor import (
     BLOQUEIO_MINUTOS,
     MAX_FALHAS_LOGIN,
-    OTP_VALIDADE_MINUTOS,
     SENHA_VALIDADE_DIAS,
     autenticar_conta,
     conta_bloqueada,
@@ -41,7 +39,6 @@ from planilha import (
 )
 
 ENABLE_2FA = os.getenv("ENABLE_2FA", "false").strip().lower() in {"1", "true", "yes", "sim"}
-RESET_OTP_REENVIAR_SEGUNDOS = 60
 
 
 def autenticado() -> bool:
@@ -158,18 +155,6 @@ def _validar_senha_nova(senha: str, confirmacao: str) -> str | None:
     if senha != confirmacao:
         return "A confirmação da senha não confere."
     return None
-
-
-def _mascarar_email(email: str) -> str:
-    valor = str(email or "").strip()
-    if "@" not in valor:
-        return "***"
-    local, dominio = valor.split("@", 1)
-    if len(local) <= 1:
-        local_m = "*"
-    else:
-        local_m = local[0] + "***"
-    return f"{local_m}@{dominio}"
 
 
 def _limpar_estado_reset() -> None:
@@ -399,7 +384,7 @@ def _render_tela_login_form() -> None:
         if st.button("Criar conta", use_container_width=True):
             _ir_para("cadastro", codigo=_codigo_preferido())
     with c2:
-        if st.button("Esqueci / alterar senha", use_container_width=True, key="btn_ir_esqueci"):
+        if st.button("Esqueci a senha", use_container_width=True, key="btn_ir_esqueci"):
             _ir_para("esqueci", codigo=_codigo_preferido())
 
     if not entrar:
@@ -507,203 +492,26 @@ def _render_tela_redefinir() -> None:
     st.rerun()
 
 
-def _enviar_otp_reset(conta: dict, info: dict[str, str]) -> None:
-    email = str(conta.get("email") or "").strip().lower()
-    otp = gerar_otp(info["codigo_fornecedor"], "reset")
-    enviar_email(
-        email,
-        "Código para redefinir senha — Formulário Alcoa",
-        (
-            f"Olá,\n\n"
-            f"Seu código para redefinir a senha é: {otp}\n"
-            f"Válido por cerca de {OTP_VALIDADE_MINUTOS} minuto(s).\n\n"
-            f"Se você não pediu isso, ignore este e-mail.\n"
-        ),
-    )
-    st.session_state.reset_passo = 2
-    st.session_state.reset_codigo = info["codigo_fornecedor"]
-    st.session_state.reset_email_mascara = _mascarar_email(email)
-    st.session_state.reset_otp_enviado_em = time()
-    registrar_acesso(
-        info["codigo_fornecedor"],
-        "senha_reset_otp",
-        fornecedor=info["fornecedor"],
-        detalhes=_mascarar_email(email),
-    )
-
-
 def _render_tela_esqueci() -> None:
+    """Recuperação sem e-mail: orientar a pedir reset à equipe no dashboard."""
+    _limpar_estado_reset()
     st.markdown(
         """
         <div class="login-box">
-            <h2>🔑 Esqueci / alterar senha</h2>
-            <p>Enviaremos um <strong>código de 6 dígitos</strong> para o e-mail
-            cadastrado. Com ele você define a <strong>nova senha</strong>
-            — <strong>não precisa</strong> da senha atual.</p>
+            <h2>🔑 Esqueci a senha</h2>
+            <p>A recuperação automática por e-mail não está disponível no momento.</p>
+            <p>Entre em contato com a <strong>equipe Alcoa</strong> e peça o
+            <strong>reset de senha</strong>. Eles geram uma senha temporária;
+            no próximo login você define a sua nova senha.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-
-    if not smtp_configurado():
-        st.warning(
-            "Recuperação por e-mail indisponível no momento "
-            "(configure RESEND com domínio verificado, ou SMTP). "
-            "Peça à equipe Alcoa para resetar a senha no **dashboard**."
-        )
-        if st.button("Voltar para login", use_container_width=True, key="esqueci_smtp_voltar"):
-            _ir_para("login", codigo=_codigo_preferido())
-        return
-
-    if st.session_state.get("auth_msg"):
-        st.info(st.session_state.auth_msg)
-        st.session_state.pop("auth_msg", None)
-
-    passo = int(st.session_state.get("reset_passo") or 1)
-
-    if passo < 2:
-        with st.form("form_esqueci_passo1"):
-            login = st.text_input(
-                "Usuário ou código Alcoa",
-                value=_codigo_preferido(),
-                placeholder="Ex: compras.ars ou 123",
-            )
-            email = st.text_input(
-                "E-mail cadastrado",
-                placeholder="compras@empresa.com",
-                help="Deve ser o mesmo e-mail informado no cadastro.",
-            )
-            enviar = st.form_submit_button(
-                "Enviar código",
-                type="primary",
-                use_container_width=True,
-            )
-        if st.button("Voltar para login", use_container_width=True, key="esqueci_voltar1"):
-            _ir_para("login", codigo=_codigo_preferido())
-        if not enviar:
-            return
-
-        erro_email = validar_email(email)
-        if erro_email:
-            st.error(erro_email)
-            return
-
-        conta = obter_conta_por_login(login)
-        email_norm = email.strip().lower()
-        # Mensagem genérica para não revelar se a conta existe
-        msg_generica = (
-            "Se os dados estiverem corretos, enviaremos um código para o e-mail informado. "
-            "Verifique a caixa de entrada."
-        )
-        if not conta:
-            st.info(msg_generica)
-            return
-        email_conta = str(conta.get("email") or "").strip().lower()
-        if not email_conta:
-            st.error(
-                "Esta conta não tem e-mail cadastrado. "
-                "Cadastre um e-mail ou peça suporte à equipe Alcoa."
-            )
-            return
-        if email_conta != email_norm:
-            st.info(msg_generica)
-            return
-
-        info = {
-            "codigo_fornecedor": conta["codigo_fornecedor"],
-            "fornecedor": conta["fornecedor"],
-        }
-        try:
-            _enviar_otp_reset(conta, info)
-        except Exception as exc:
-            st.error(f"Não foi possível enviar o e-mail: {exc}")
-            return
-        st.session_state.auth_msg = (
-            f"Código enviado para {_mascarar_email(email_conta)}. "
-            f"Válido por cerca de {OTP_VALIDADE_MINUTOS} minuto(s)."
-        )
-        st.rerun()
-        return
-
-    mascara = st.session_state.get("reset_email_mascara", "***")
-    st.success(f"Código enviado para **{mascara}**.")
-
-    with st.form("form_esqueci_passo2"):
-        otp = st.text_input("Código de 6 dígitos")
-        nova = st.text_input("Nova senha", type="password")
-        confirmar = st.text_input("Confirmar nova senha", type="password")
-        salvar = st.form_submit_button(
-            "Salvar nova senha",
-            type="primary",
-            use_container_width=True,
-        )
-
-    c_re, c_vol = st.columns(2)
-    with c_re:
-        if st.button("Reenviar código", use_container_width=True, key="esqueci_reenviar"):
-            ultimo = float(st.session_state.get("reset_otp_enviado_em") or 0)
-            faltam = RESET_OTP_REENVIAR_SEGUNDOS - (time() - ultimo)
-            if faltam > 0:
-                st.warning(f"Aguarde {int(faltam)} segundo(s) antes de reenviar.")
-            else:
-                codigo = str(st.session_state.get("reset_codigo") or "")
-                conta = obter_conta(codigo)
-                info = resolver_fornecedor_por_codigo(codigo)
-                if conta and info:
-                    try:
-                        _enviar_otp_reset(conta, info)
-                        st.session_state.auth_msg = "Novo código enviado."
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(f"Falha ao reenviar: {exc}")
-                else:
-                    st.error("Sessão de recuperação inválida. Comece de novo.")
-                    _limpar_estado_reset()
-    with c_vol:
-        if st.button("Voltar para login", use_container_width=True, key="esqueci_voltar2"):
-            _ir_para("login", codigo=_codigo_preferido())
-
-    if not salvar:
-        return
-
-    codigo = str(st.session_state.get("reset_codigo") or "")
-    info = resolver_fornecedor_por_codigo(codigo)
-    if not info:
-        st.error("Sessão de recuperação inválida. Comece de novo.")
-        _limpar_estado_reset()
-        return
-
-    erro = _validar_senha_nova(nova, confirmar)
-    if erro:
-        st.error(erro)
-        return
-
-    if not verificar_otp(info["codigo_fornecedor"], otp, "reset"):
-        st.error("Código inválido ou expirado.")
-        registrar_acesso(
-            info["codigo_fornecedor"],
-            "senha_reset_otp_fail",
-            fornecedor=info["fornecedor"],
-        )
-        return
-
-    try:
-        redefinir_senha(info["codigo_fornecedor"], nova, via_otp=True)
-        registrar_acesso(
-            info["codigo_fornecedor"],
-            "senha_redefinida_otp",
-            fornecedor=info["fornecedor"],
-        )
-    except ValueError as exc:
-        st.error(str(exc))
-        return
-
-    _limpar_estado_reset()
-    _ir_para(
-        "login",
-        msg="Senha redefinida com sucesso! Entre com a nova senha.",
-        codigo=info["codigo_fornecedor"],
+    st.info(
+        "Informe seu **usuário** ou **código Alcoa** à equipe para agilizar o atendimento."
     )
+    if st.button("Voltar para login", type="primary", use_container_width=True, key="esqueci_voltar"):
+        _ir_para("login", codigo=_codigo_preferido())
 
 
 def _render_tela_2fa() -> None:
@@ -809,7 +617,7 @@ def _render_entrar_com_senha_link(info: dict[str, str], po: str, linha: str) -> 
     with st.form("login_senha_link_fornecedor"):
         senha = st.text_input("Senha", type="password")
         entrar = st.form_submit_button("Entrar", type="primary", use_container_width=True)
-    if st.button("Esqueci / alterar senha", key="link_esqueci"):
+    if st.button("Esqueci a senha", key="link_esqueci"):
         _ir_para("esqueci", codigo=info["codigo_fornecedor"])
     if not entrar:
         return
