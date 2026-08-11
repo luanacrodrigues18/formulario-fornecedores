@@ -4,9 +4,10 @@ Sistema em Python com **Streamlit** e **Supabase** para coleta de retorno de for
 
 ## Funcionalidades
 
-- **Cadastro** - o fornecedor cria **usuário** + **senha** (vinculado ao código Alcoa da empresa)
+- **Cadastro** - o fornecedor cria **usuário** + **senha** + **e-mail** (vinculado ao código Alcoa da empresa)
 - **Login** - entra com **usuário ou código Alcoa** + senha
-- **Redefinir senha** - exige a senha atual (sem recuperação por e-mail no fluxo atual)
+- **Alterar senha** - exige a senha atual
+- **Esqueci a senha** - código OTP enviado por e-mail (SMTP) para definir nova senha
 - Formulário em **página única** (busca + lista + formulário lado a lado)
 - Seleção de **vários pedidos** e preenchimento em sequência
 - Assistente **ALUX** (dicas e FAQ na sidebar)
@@ -56,6 +57,8 @@ FORM_BASE_URL=http://localhost:8501
 - **service_role (`SUPABASE_SERVICE_ROLE_KEY`)**: chave secreta do servidor - **nunca** publique no Git nem no front. Necessária com o RLS fechado (`sql/fechar_rls.sql`).
 
 No Streamlit Cloud, use as mesmas chaves em **Secrets**.
+
+Para **Esqueci a senha**, configure também SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TLS`). Sem SMTP, o botão avisa que a recuperação está indisponível.
 
 ## Criar tabelas no Supabase
 
@@ -138,7 +141,8 @@ Código Alcoa  →  fornecedores_codigos.json  →  Nome na FUP
 | Hash | PBKDF2 - senha não fica em texto puro |
 | Bloqueio | Após falhas de login (padrão: 5 / 15 min) |
 | Rotação | Troca obrigatória após 90 dias (configurável) |
-| Redefinir | Exige senha atual |
+| Alterar senha | Exige senha atual |
+| Esqueci a senha | OTP por e-mail (requer SMTP) |
 | RLS | Fechado com `fechar_rls.sql` + `service_role` |
 | HTTPS | Streamlit Cloud |
 
@@ -239,12 +243,12 @@ mapear_rede_alcoa.bat    # mapeia V: na pasta InfoShare
 ```
 projeto/
 ├── app.py                          # Formulário + fluxo
-├── auth_fornecedor.py              # Cadastro, login, redefinir senha
+├── auth_fornecedor.py              # Cadastro, login, alterar / esqueci senha
 ├── contas_fornecedor.py            # Contas, hash, bloqueio, logs
 ├── database.py                     # Supabase (service_role) + validações
 ├── planilha.py                     # Leitura FUP / export retorno
 ├── alcoano.py                      # ALUX (dicas / FAQ)
-├── email_smtp.py                   # SMTP opcional (2FA)
+├── email_smtp.py                   # SMTP (esqueci senha / 2FA)
 ├── sql/fechar_rls.sql              # Fecha políticas públicas
 ├── dashboard.py                    # Dashboard + export retorno FUP
 ├── gerar_codigos_fornecedores.py

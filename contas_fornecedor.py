@@ -31,6 +31,17 @@ def validar_forca_senha(senha: str) -> str | None:
     return None
 
 
+def validar_email(email: str) -> str | None:
+    valor = str(email or "").strip().lower()
+    if not valor:
+        return "Informe o e-mail corporativo."
+    if "@" not in valor or "." not in valor.split("@")[-1]:
+        return "E-mail inválido."
+    if len(valor) < 6:
+        return "E-mail inválido."
+    return None
+
+
 def validar_usuario(usuario: str) -> str | None:
     u = str(usuario or "").strip().lower()
     if len(u) < 3:
@@ -286,6 +297,9 @@ def criar_conta(
     erro_user = validar_usuario(usuario)
     if erro_user:
         raise ValueError(erro_user)
+    erro_email = validar_email(email)
+    if erro_email:
+        raise ValueError(erro_email)
     erro = validar_forca_senha(senha)
     if erro:
         raise ValueError(erro)
