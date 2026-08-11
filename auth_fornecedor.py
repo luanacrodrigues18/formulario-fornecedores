@@ -437,9 +437,7 @@ def _render_tela_redefinir() -> None:
         f"""
         <div class="login-box">
             <h2>🔄 {"Troca obrigatória de senha" if forcar else "Alterar senha"}</h2>
-            <p>Informe o <strong>código</strong>, a <strong>senha atual</strong>
-            e a <strong>nova senha</strong> (mín. 8, letra e número).</p>
-            <p>Esqueceu a senha? Volte ao login e use <strong>Esqueci a senha</strong>.</p>
+            <p>{"Informe a senha atual e a nova senha (mín. 8, letra e número)." if forcar else "Se você <strong>lembra</strong> a senha atual, altere abaixo. Se <strong>esqueceu</strong>, use a recuperação por e-mail."}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -448,6 +446,16 @@ def _render_tela_redefinir() -> None:
     if st.session_state.get("auth_msg"):
         st.warning(st.session_state.auth_msg)
         st.session_state.pop("auth_msg", None)
+
+    if not forcar:
+        if st.button(
+            "🔑 Não sei a senha atual — recuperar por e-mail",
+            type="primary",
+            use_container_width=True,
+            key="alterar_ir_esqueci",
+        ):
+            _ir_para("esqueci", codigo=_codigo_preferido() or codigo_atual())
+        st.caption("Ou, se ainda lembrar a senha atual:")
 
     with st.form("form_redefinir_senha"):
         codigo = st.text_input(
@@ -460,7 +468,7 @@ def _render_tela_redefinir() -> None:
         confirmar = st.text_input("Confirmar nova senha", type="password")
         salvar = st.form_submit_button(
             "Salvar nova senha",
-            type="primary",
+            type="primary" if forcar else "secondary",
             use_container_width=True,
         )
 
